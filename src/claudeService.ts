@@ -1,60 +1,146 @@
 import * as vscode from 'vscode';
 
+// Timing constants
+const TERMINAL_FOCUS_DELAY_MS = 50;
+const DECLINE_REASON_DELAY_MS = 500;
+
 /**
  * Delay between sending a choice number and the feedback text to Claude.
  * Claude Code needs time to process the choice selection before accepting text input.
  */
 export const CLAUDE_CHOICE_FEEDBACK_DELAY_MS = 300;
 
+/**
+ * Tracks which terminal belongs to which Claude session
+ * Key: session ID (e.g., "toasty-colecashtari")
+ * Value: Terminal instance
+ */
+const sessionTerminalMap: Map<string, vscode.Terminal> = new Map();
+
+/**
+ * Disposables for terminal close listeners - cleaned up on deactivate
+ */
+const terminalDisposables: vscode.Disposable[] = [];
+
+/**
+ * Register a terminal for a specific session
+ */
+export function registerSessionTerminal(sessionId: string, terminal: vscode.Terminal): void {
+  sessionTerminalMap.set(sessionId, terminal);
+
+  // Clean up when terminal closes
+  const disposable = vscode.window.onDidCloseTerminal(closedTerminal => {
+    if (closedTerminal === terminal) {
+      sessionTerminalMap.delete(sessionId);
+      const idx = terminalDisposables.indexOf(disposable);
+      if (idx >= 0) terminalDisposables.splice(idx, 1);
+      disposable.dispose();
+    }
+  });
+  terminalDisposables.push(disposable);
+}
+
+/**
+ * Get terminal for a specific session
+ */
+export function getSessionTerminal(sessionId: string): vscode.Terminal | undefined {
+  const terminal = sessionTerminalMap.get(sessionId);
+  if (!terminal) {
+    return undefined;
+  }
+  // Verify terminal is still valid
+  if (vscode.window.terminals.includes(terminal)) {
+    return terminal;
+  }
+  // Clean up stale reference
+  sessionTerminalMap.delete(sessionId);
+  return undefined;
+}
+
+/**
+ * Clean up all terminal tracking resources
+ * Call this from extension deactivate
+ */
+export function disposeTerminalTracking(): void {
+  terminalDisposables.forEach(d => d.dispose());
+  terminalDisposables.length = 0;
+  sessionTerminalMap.clear();
+}
+
 export class ClaudeService {
   private _outputChannel: vscode.OutputChannel;
+  private _targetSessionId: string | undefined;
 
-  constructor() {
+  constructor(sessionId?: string) {
     this._outputChannel = vscode.window.createOutputChannel('Claude Artifacts');
+    this._targetSessionId = sessionId;
   }
 
   /**
-   * Find active Claude Code terminal
-   * Claude Code runs as a node process, so terminals named "node" are valid
-   * We just need to exclude the Extension Development Host debug terminal
+   * Set the target session for this service instance
+   */
+  public setTargetSession(sessionId: string): void {
+    this._targetSessionId = sessionId;
+  }
+
+  /**
+   * Get the current target session ID
+   */
+  public getTargetSession(): string | undefined {
+    return this._targetSessionId;
+  }
+
+  /**
+   * Find Claude Code terminal for the target session
+   * First tries the registered session terminal, then falls back to Claude-specific terminals only
    */
   private _findClaudeTerminal(): vscode.Terminal | undefined {
+    // First: try to find terminal by session ID (registered via Resume Session)
+    if (this._targetSessionId) {
+      const sessionTerminal = getSessionTerminal(this._targetSessionId);
+      if (sessionTerminal) {
+        this._outputChannel.appendLine(`Found registered terminal for session: ${this._targetSessionId}`);
+        return sessionTerminal;
+      }
+
+      // Try to find by terminal name containing session ID
+      for (const terminal of vscode.window.terminals) {
+        if (terminal.name.toLowerCase().includes(this._targetSessionId.toLowerCase())) {
+          this._outputChannel.appendLine(`Found terminal by name match: ${terminal.name}`);
+          // Register it for future use
+          registerSessionTerminal(this._targetSessionId, terminal);
+          return terminal;
+        }
+      }
+    }
+
+    // Fallback: find terminals that are likely running Claude
+    // ONLY accept terminals with "claude" in the name - don't send to random shells!
     const terminals = vscode.window.terminals;
 
-    // Look for terminals - Claude Code shows up as "node"
-    // We want to find a terminal that's running Claude, not the extension debug process
     for (const terminal of terminals) {
       const name = terminal.name.toLowerCase();
 
-      // Skip extension development terminals
-      if (name.includes('extension development') || name.includes('debug console')) {
-        continue;
-      }
-
-      // Accept shell terminals and node (which is Claude Code)
-      if (
-        name.includes('claude') ||
-        name === 'node' ||
-        name === 'bash' ||
-        name === 'zsh' ||
-        name === 'fish' ||
-        name === 'sh' ||
-        name === 'pwsh' ||
-        name === 'powershell' ||
-        name.includes('task')
-      ) {
+      // Only accept terminals explicitly named "claude" or similar
+      if (name.includes('claude')) {
+        this._outputChannel.appendLine(`Found Claude terminal: ${terminal.name}`);
         return terminal;
       }
     }
 
-    // Fallback: return any terminal that's not a debug terminal
-    for (const terminal of terminals) {
-      const name = terminal.name.toLowerCase();
-      if (!name.includes('extension') && !name.includes('debug')) {
-        return terminal;
+    // Also check for "node" which is how Claude Code appears sometimes
+    // But only if it's the active terminal (user likely has it focused)
+    const activeTerminal = vscode.window.activeTerminal;
+    if (activeTerminal) {
+      const name = activeTerminal.name.toLowerCase();
+      if (name === 'node' || name.includes('claude')) {
+        this._outputChannel.appendLine(`Using active terminal: ${activeTerminal.name}`);
+        return activeTerminal;
       }
     }
 
+    // Don't return random shells - this causes the bug where input goes to wrong terminal
+    this._outputChannel.appendLine(`No Claude terminal found for session: ${this._targetSessionId || 'unknown'}`);
     return undefined;
   }
 
@@ -69,7 +155,7 @@ export class ClaudeService {
     // Just use sendRawSequence - it works!
     // Send text without Enter first, then Enter separately
     await this.sendRawSequence(text);
-    await this._delay(50);
+    await this._delay(TERMINAL_FOCUS_DELAY_MS);
     await this.sendRawSequence('\r');
   }
 
@@ -159,35 +245,65 @@ export class ClaudeService {
    */
   public async sendRawSequence(sequence: string): Promise<void> {
     this._outputChannel.appendLine(`\n--- Sending Raw Sequence ---`);
+    this._outputChannel.appendLine(`Session: ${this._targetSessionId || 'none'}`);
     this._outputChannel.appendLine(`Sequence: ${JSON.stringify(sequence)}`);
 
-    let terminal = vscode.window.activeTerminal;
+    // First try to find the correct Claude terminal
+    let terminal = this._findClaudeTerminal();
+
+    // If no Claude terminal found, use the active terminal if user has one focused
+    // This allows sending to a manually started Claude session
     if (!terminal) {
-      terminal = this._findClaudeTerminal();
+      const activeTerminal = vscode.window.activeTerminal;
+      if (activeTerminal) {
+        this._outputChannel.appendLine(`Using active terminal: ${activeTerminal.name}`);
+        terminal = activeTerminal;
+
+        // Register it for this session so future sends go to the same terminal
+        if (this._targetSessionId) {
+          registerSessionTerminal(this._targetSessionId, activeTerminal);
+        }
+      }
     }
 
     if (!terminal) {
-      const availableTerminals = this.listTerminals();
+      const sessionInfo = this._targetSessionId
+        ? `"${this._targetSessionId}"`
+        : 'this session';
       throw new Error(
-        'No Claude Code terminal found. ' +
-        'Please ensure Claude Code is running in a terminal.' +
-        (availableTerminals.length > 0
-          ? ` Available terminals: ${availableTerminals.join(', ')}`
-          : ' No terminals are open.')
+        `No terminal found for ${sessionInfo}. ` +
+        'Start the session via "Resume Session" button in the Sessions panel, ' +
+        'so the extension can track which terminal belongs to which plan.'
       );
     }
 
-    // Focus terminal
+    this._outputChannel.appendLine(`Using terminal: ${terminal.name}`);
+
+    // Focus terminal first to ensure it's active
     terminal.show(true);
-    await this._delay(50);
+    await this._delay(TERMINAL_FOCUS_DELAY_MS);
 
-    // Try multiple methods
-    this._outputChannel.appendLine(`Method 1: sendSequence command`);
-    await vscode.commands.executeCommand('workbench.action.terminal.sendSequence', {
-      text: sequence
-    });
+    // Use terminal.sendText() for direct sending to specific terminal
+    // This avoids race conditions with workbench.action.terminal.sendSequence
+    // which sends to the currently focused terminal (could change between find and send)
+    this._outputChannel.appendLine(`Sending via terminal.sendText()`);
 
-    this._outputChannel.appendLine(`✓ Sent`);
+    // For raw sequences like escape codes, we need to handle them specially
+    // terminal.sendText() adds a newline by default, so we use addNewLine: false for raw sequences
+    const isRawEscapeSequence = sequence.startsWith('\x1b') || sequence === '\r';
+
+    if (isRawEscapeSequence) {
+      // For escape sequences, we still need sendSequence as sendText doesn't handle them well
+      // But we've already focused the correct terminal above
+      await vscode.commands.executeCommand('workbench.action.terminal.sendSequence', {
+        text: sequence
+      });
+    } else {
+      // For regular text, use sendText which is more reliable
+      terminal.sendText(sequence, false);
+    }
+
+    this._outputChannel.appendLine(`✓ Sent to ${terminal.name}`);
   }
 
   /**

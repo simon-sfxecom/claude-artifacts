@@ -181,6 +181,104 @@ export class SessionService {
   }
 
   /**
+   * Get session file path for watching
+   */
+  getSessionFilePath(sessionId: string, projectPath: string): string {
+    const encodedPath = this.encodePath(projectPath);
+    return path.join(this.claudeDir, 'projects', encodedPath, `${sessionId}.jsonl`);
+  }
+
+  /**
+   * Tools that indicate Claude is waiting for user input
+   */
+  private readonly INPUT_REQUIRED_TOOLS = [
+    'AskUserQuestion',
+    'ExitPlanMode',      // Plan approval
+  ];
+
+  /**
+   * Get last activity from a session file (for live streaming)
+   * Returns the last few entries without reading the entire file
+   */
+  async getLastActivity(sessionId: string, projectPath: string): Promise<{
+    lastMessage?: string;
+    currentTool?: string;
+    isThinking?: boolean;
+    inputRequired?: boolean;
+    waitingTool?: string;
+  }> {
+    const sessionFile = this.getSessionFilePath(sessionId, projectPath);
+
+    try {
+      const content = await fs.readFile(sessionFile, 'utf-8');
+      const lines = content.trim().split('\n').filter(Boolean);
+
+      // Get last 20 lines to find recent activity and input status
+      const recentLines = lines.slice(-20);
+      let lastMessage: string | undefined;
+      let currentTool: string | undefined;
+      let isThinking = false;
+      let inputRequired = false;
+      let waitingTool: string | undefined;
+
+      // Track last assistant tool and whether user responded
+      let lastAssistantToolUse: string | undefined;
+      let userRespondedAfterTool = false;
+
+      // Process in chronological order to track state
+      for (const line of recentLines) {
+        try {
+          const entry = JSON.parse(line);
+
+          // Check for user response (tool_result or user message)
+          if (entry.type === 'user' || entry.message?.role === 'user') {
+            userRespondedAfterTool = true;
+          }
+
+          // Check for assistant tool use
+          if (entry.type === 'assistant' && entry.message?.content) {
+            for (const block of entry.message.content) {
+              if (block.type === 'tool_use') {
+                lastAssistantToolUse = block.name;
+                userRespondedAfterTool = false; // Reset on new tool use
+
+                if (!currentTool) {
+                  currentTool = block.name;
+                  isThinking = true;
+                }
+              }
+              if (block.type === 'text' && !lastMessage) {
+                lastMessage = block.text?.slice(0, 100);
+              }
+            }
+          }
+
+          // Check direct content
+          if (entry.type === 'assistant' && entry.content && !lastMessage) {
+            lastMessage = typeof entry.content === 'string'
+              ? entry.content.slice(0, 100)
+              : undefined;
+          }
+        } catch {
+          // Skip unparseable lines
+        }
+      }
+
+      // Determine if input is required
+      if (lastAssistantToolUse && !userRespondedAfterTool) {
+        if (this.INPUT_REQUIRED_TOOLS.includes(lastAssistantToolUse)) {
+          inputRequired = true;
+          waitingTool = lastAssistantToolUse;
+        }
+      }
+
+      return { lastMessage, currentTool, isThinking, inputRequired, waitingTool };
+    } catch {
+      return {};
+    }
+  }
+
+  /**
    * Get all plan files
    */
   async getPlans(): Promise<ClaudePlan[]> {

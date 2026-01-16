@@ -34,6 +34,10 @@ export interface ClaudeSession {
   planFile?: string;
   /** Associated worktree path (if any) */
   worktreePath?: string;
+  /** Whether Claude is waiting for user input (e.g., AskUserQuestion) */
+  inputRequired?: boolean;
+  /** The tool waiting for input (e.g., "AskUserQuestion", "TodoWrite") */
+  waitingTool?: string;
 }
 
 export type SessionStatus = 'active' | 'paused' | 'completed' | 'unknown';

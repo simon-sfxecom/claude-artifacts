@@ -25,10 +25,24 @@ export class ArtifactState {
   private _approvalMode: 'bypass' | 'manual' | null = null;
   private _claudeService: ClaudeService;
   private _permissionMode: PermissionMode;
+  private _sessionId: string | undefined;
 
-  constructor() {
-    this._claudeService = new ClaudeService();
+  constructor(sessionId?: string) {
+    this._sessionId = sessionId;
+    this._claudeService = new ClaudeService(sessionId);
     this._permissionMode = loadPermissionMode();
+  }
+
+  /**
+   * Set the target session ID (extracted from plan filename)
+   */
+  setSessionId(sessionId: string): void {
+    this._sessionId = sessionId;
+    this._claudeService.setTargetSession(sessionId);
+  }
+
+  get sessionId(): string | undefined {
+    return this._sessionId;
   }
 
   get comments(): Comment[] {

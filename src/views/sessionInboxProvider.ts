@@ -1,6 +1,6 @@
 /**
  * TreeDataProvider for Session Inbox view
- * Shows Claude Code sessions grouped by project with recent plans at the top
+ * Shows Claude Code sessions for the current workspace with smart filtering
  */
 
 import * as vscode from 'vscode';
@@ -8,12 +8,34 @@ import * as path from 'path';
 import { getSessionService } from '../services/sessionService';
 import { ClaudeProject, ClaudeSession, ClaudePlan, SessionStatus } from '../models/session';
 
-type TreeItemType = 'inbox-header' | 'plans-header' | 'projects-header' | 'plan' | 'project' | 'session';
+type TreeItemType =
+  | 'current-project-header'
+  | 'active-sessions-header'
+  | 'recent-sessions-header'
+  | 'plans-header'
+  | 'other-projects-header'
+  | 'plan'
+  | 'project'
+  | 'session';
 
 interface SessionTreeItem {
   type: TreeItemType;
   data?: ClaudeProject | ClaudeSession | ClaudePlan;
   label: string;
+}
+
+const MAX_RECENT_SESSIONS = 10;
+const MAX_OTHER_PROJECTS = 5;
+const LIVE_UPDATE_INTERVAL = 2000; // 2 seconds
+
+interface LiveSessionState {
+  sessionId: string;
+  projectPath: string;
+  lastMessage?: string;
+  currentTool?: string;
+  isThinking?: boolean;
+  inputRequired?: boolean;
+  waitingTool?: string;
 }
 
 export class SessionInboxProvider implements vscode.TreeDataProvider<SessionTreeItem>, vscode.Disposable {
@@ -23,26 +45,99 @@ export class SessionInboxProvider implements vscode.TreeDataProvider<SessionTree
   private sessionService = getSessionService();
   private fileWatcher: vscode.FileSystemWatcher | undefined;
   private refreshTimeout: NodeJS.Timeout | undefined;
+  private liveUpdateInterval: NodeJS.Timeout | undefined;
   private disposables: vscode.Disposable[] = [];
+  private liveSessionStates: Map<string, LiveSessionState> = new Map();
 
   constructor() {
     this.setupFileWatcher();
+    this.setupWorkspaceWatcher();
+    this.setupLiveUpdates();
   }
 
   private setupFileWatcher(): void {
-    // Watch for changes in ~/.claude/
     const claudeDir = this.sessionService.getClaudeDir();
 
     // Watch history.jsonl for new activity
     const historyPattern = new vscode.RelativePattern(claudeDir, 'history.jsonl');
     this.fileWatcher = vscode.workspace.createFileSystemWatcher(historyPattern);
 
-    // Track event subscriptions for proper disposal
     this.disposables.push(
       this.fileWatcher.onDidChange(() => this.debouncedRefresh()),
       this.fileWatcher.onDidCreate(() => this.debouncedRefresh()),
       this.fileWatcher.onDidDelete(() => this.debouncedRefresh())
     );
+  }
+
+  private setupWorkspaceWatcher(): void {
+    // Refresh when workspace changes
+    this.disposables.push(
+      vscode.workspace.onDidChangeWorkspaceFolders(() => this.refresh())
+    );
+  }
+
+  private setupLiveUpdates(): void {
+    // Poll active sessions for live updates
+    this.liveUpdateInterval = setInterval(async () => {
+      await this.updateLiveSessionStates();
+    }, LIVE_UPDATE_INTERVAL);
+  }
+
+  private async updateLiveSessionStates(): Promise<void> {
+    try {
+      const allProjects = await this.sessionService.getProjects();
+      const activeSessions = allProjects.flatMap(p =>
+        p.sessions.filter(s => s.status === 'active').map(s => ({
+          session: s,
+          projectPath: p.path
+        }))
+      );
+
+      let hasChanges = false;
+
+      // Update state for each active session
+      for (const { session, projectPath } of activeSessions) {
+        const activity = await this.sessionService.getLastActivity(session.id, projectPath);
+        const currentState = this.liveSessionStates.get(session.id);
+
+        // Check if state changed
+        if (!currentState ||
+            currentState.lastMessage !== activity.lastMessage ||
+            currentState.currentTool !== activity.currentTool ||
+            currentState.inputRequired !== activity.inputRequired) {
+          this.liveSessionStates.set(session.id, {
+            sessionId: session.id,
+            projectPath,
+            ...activity
+          });
+          hasChanges = true;
+        }
+      }
+
+      // Clean up states for sessions that are no longer active
+      const activeIds = new Set(activeSessions.map(s => s.session.id));
+      for (const id of this.liveSessionStates.keys()) {
+        if (!activeIds.has(id)) {
+          this.liveSessionStates.delete(id);
+          hasChanges = true;
+        }
+      }
+
+      // Only refresh if something changed
+      if (hasChanges) {
+        this._onDidChangeTreeData.fire();
+      }
+    } catch (error) {
+      console.error('Failed to update live session states:', error);
+    }
+  }
+
+  getLiveState(sessionId: string): LiveSessionState | undefined {
+    return this.liveSessionStates.get(sessionId);
+  }
+
+  private getCurrentWorkspacePath(): string | undefined {
+    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   }
 
   private debouncedRefresh(): void {
@@ -63,59 +158,110 @@ export class SessionInboxProvider implements vscode.TreeDataProvider<SessionTree
     const item = new vscode.TreeItem(element.label);
 
     switch (element.type) {
-      case 'inbox-header':
-        item.iconPath = new vscode.ThemeIcon('inbox');
-        item.collapsibleState = vscode.TreeItemCollapsibleState.None;
-        item.contextValue = 'inbox-header';
+      case 'current-project-header':
+        item.iconPath = new vscode.ThemeIcon('folder-active');
+        item.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+        item.contextValue = 'current-project-header';
+        item.description = 'current workspace';
+        break;
+
+      case 'active-sessions-header':
+        item.iconPath = new vscode.ThemeIcon('pulse');
+        item.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+        item.contextValue = 'active-sessions-header';
+        break;
+
+      case 'recent-sessions-header':
+        item.iconPath = new vscode.ThemeIcon('history');
+        item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+        item.contextValue = 'recent-sessions-header';
         break;
 
       case 'plans-header':
         item.iconPath = new vscode.ThemeIcon('file-text');
-        item.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+        item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
         item.contextValue = 'plans-header';
         break;
 
-      case 'projects-header':
+      case 'other-projects-header':
         item.iconPath = new vscode.ThemeIcon('folder-library');
-        item.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
-        item.contextValue = 'projects-header';
+        item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+        item.contextValue = 'other-projects-header';
         break;
 
       case 'plan':
         const plan = element.data as ClaudePlan;
+        if (!plan) break;
         item.iconPath = new vscode.ThemeIcon('file-code');
         item.collapsibleState = vscode.TreeItemCollapsibleState.None;
         item.tooltip = plan.preview || plan.filename;
         item.description = this.getRelativeTime(plan.mtime);
         item.command = {
-          command: 'vscode.open',
-          title: 'Open Plan',
-          arguments: [vscode.Uri.file(plan.path)]
+          command: 'claudeArtifacts.openPlan',
+          title: 'Open Plan in Tab',
+          arguments: [plan.path]
         };
         item.contextValue = 'plan';
         break;
 
       case 'project':
         const project = element.data as ClaudeProject;
+        if (!project) break;
         item.iconPath = new vscode.ThemeIcon('folder');
         item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
-        item.description = `${project.sessions.length} sessions`;
+        const activeCount = project.sessions.filter(s => s.status === 'active').length;
+        item.description = activeCount > 0
+          ? `${activeCount} active, ${project.sessions.length} total`
+          : `${project.sessions.length} sessions`;
         item.tooltip = project.path;
         item.contextValue = 'project';
         break;
 
       case 'session':
         const session = element.data as ClaudeSession;
-        item.iconPath = this.getSessionIcon(session.status);
+        if (!session) break;
+
+        // Check for live state if this is an active session
+        const liveState = session.status === 'active' ? this.liveSessionStates.get(session.id) : undefined;
+
+        if (liveState?.inputRequired) {
+          // Show warning icon when Claude is waiting for user input
+          item.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('charts.yellow'));
+          const toolLabel = this.getInputToolLabel(liveState.waitingTool);
+          item.description = `⚠️ ${toolLabel}`;
+          item.tooltip = [
+            session.displayName,
+            `⚠️ Input Required: ${toolLabel}`,
+            liveState.lastMessage ? `"${liveState.lastMessage}..."` : '',
+            `${session.messageCount} messages`
+          ].filter(Boolean).join('\n');
+        } else if (liveState?.currentTool) {
+          // Show spinning icon and current tool for active sessions
+          item.iconPath = new vscode.ThemeIcon('sync~spin', new vscode.ThemeColor('charts.blue'));
+          item.description = `⚡ ${liveState.currentTool}`;
+          item.tooltip = [
+            session.displayName,
+            `Tool: ${liveState.currentTool}`,
+            liveState.lastMessage ? `"${liveState.lastMessage}..."` : '',
+            `${session.messageCount} messages`
+          ].filter(Boolean).join('\n');
+        } else if (liveState?.lastMessage) {
+          item.iconPath = this.getSessionIcon(session.status);
+          item.description = `💬 ${this.truncate(liveState.lastMessage, 30)}`;
+          item.tooltip = `${session.displayName}\n"${liveState.lastMessage}..."\n${session.messageCount} messages`;
+        } else {
+          item.iconPath = this.getSessionIcon(session.status);
+          item.description = this.getRelativeTime(new Date(session.lastActivity));
+          item.tooltip = `${session.displayName}\n${session.messageCount} messages\nStatus: ${session.status}`;
+        }
+
         item.collapsibleState = vscode.TreeItemCollapsibleState.None;
-        item.description = this.getRelativeTime(new Date(session.lastActivity));
-        item.tooltip = `${session.displayName}\n${session.messageCount} interactions`;
         item.command = {
           command: 'claudeArtifacts.showSessionDetails',
           title: 'Show Session Details',
           arguments: [session]
         };
-        item.contextValue = `session-${session.status}`;
+        item.contextValue = liveState?.inputRequired ? 'session-input-required' : `session-${session.status}`;
         break;
     }
 
@@ -124,19 +270,28 @@ export class SessionInboxProvider implements vscode.TreeDataProvider<SessionTree
 
   async getChildren(element?: SessionTreeItem): Promise<SessionTreeItem[]> {
     if (!element) {
-      // Root level: show sections
       return this.getRootItems();
     }
 
     switch (element.type) {
+      case 'current-project-header':
+        return this.getCurrentProjectSessions();
+
+      case 'active-sessions-header':
+        return this.getActiveSessionItems();
+
+      case 'recent-sessions-header':
+        return this.getRecentSessionItems();
+
       case 'plans-header':
         return this.getPlanItems();
 
-      case 'projects-header':
-        return this.getProjectItems();
+      case 'other-projects-header':
+        return this.getOtherProjectItems();
 
       case 'project':
         const project = element.data as ClaudeProject;
+        if (!project) return [];
         return this.getSessionItems(project);
 
       default:
@@ -145,38 +300,144 @@ export class SessionInboxProvider implements vscode.TreeDataProvider<SessionTree
   }
 
   private async getRootItems(): Promise<SessionTreeItem[]> {
-    const projects = await this.sessionService.getProjects();
-    const activeSessions = projects.reduce((count, p) =>
-      count + p.sessions.filter(s => s.status === 'active').length, 0
+    const items: SessionTreeItem[] = [];
+    const currentPath = this.getCurrentWorkspacePath();
+    const allProjects = await this.sessionService.getProjects();
+
+    // Find current project
+    const currentProject = currentPath
+      ? allProjects.find(p => p.path === currentPath || currentPath.startsWith(p.path))
+      : null;
+
+    // Count active sessions globally
+    const allActiveSessions = allProjects.flatMap(p =>
+      p.sessions.filter(s => s.status === 'active')
     );
 
-    const items: SessionTreeItem[] = [];
-
-    // Inbox header with badge
-    if (activeSessions > 0) {
+    // 1. Active Sessions (if any)
+    if (allActiveSessions.length > 0) {
       items.push({
-        type: 'inbox-header',
-        label: `Inbox (${activeSessions})`
+        type: 'active-sessions-header',
+        label: `Active Sessions (${allActiveSessions.length})`
       });
     }
 
-    // Recent Plans section
+    // 2. Current Project (if we're in one)
+    if (currentProject) {
+      items.push({
+        type: 'current-project-header',
+        label: currentProject.name
+      });
+    }
+
+    // 3. Recent Plans
     items.push({
       type: 'plans-header',
       label: 'Recent Plans'
     });
 
-    // Projects section
-    items.push({
-      type: 'projects-header',
-      label: 'Projects'
-    });
+    // 4. Other Projects
+    const otherProjects = allProjects.filter(p => p !== currentProject);
+    if (otherProjects.length > 0) {
+      items.push({
+        type: 'other-projects-header',
+        label: `Other Projects (${otherProjects.length})`
+      });
+    }
 
     return items;
   }
 
+  private async getActiveSessionItems(): Promise<SessionTreeItem[]> {
+    const allProjects = await this.sessionService.getProjects();
+    const activeSessions = allProjects.flatMap(p =>
+      p.sessions.filter(s => s.status === 'active')
+    );
+
+    // Sort by last activity
+    activeSessions.sort((a, b) => b.lastActivity - a.lastActivity);
+
+    return activeSessions.map(session => ({
+      type: 'session' as const,
+      data: session,
+      label: this.truncate(session.displayName, 40)
+    }));
+  }
+
+  private async getCurrentProjectSessions(): Promise<SessionTreeItem[]> {
+    const currentPath = this.getCurrentWorkspacePath();
+    if (!currentPath) return [];
+
+    const allProjects = await this.sessionService.getProjects();
+    const currentProject = allProjects.find(p =>
+      p.path === currentPath || currentPath.startsWith(p.path)
+    );
+
+    if (!currentProject) {
+      return [{
+        type: 'session' as const,
+        label: 'No sessions for this workspace'
+      }];
+    }
+
+    // Get active sessions first, then recent (non-active)
+    const active = currentProject.sessions.filter(s => s.status === 'active');
+    const nonActive = currentProject.sessions
+      .filter(s => s.status !== 'active')
+      .sort((a, b) => b.lastActivity - a.lastActivity)
+      .slice(0, MAX_RECENT_SESSIONS);
+
+    const sessions = [...active, ...nonActive];
+
+    if (sessions.length === 0) {
+      return [{
+        type: 'session' as const,
+        label: 'No sessions yet'
+      }];
+    }
+
+    return sessions.map(session => ({
+      type: 'session' as const,
+      data: session,
+      label: this.truncate(session.displayName, 35)
+    }));
+  }
+
+  private async getRecentSessionItems(): Promise<SessionTreeItem[]> {
+    const allProjects = await this.sessionService.getProjects();
+    const currentPath = this.getCurrentWorkspacePath();
+
+    // Get all sessions except from current project
+    const allSessions = allProjects
+      .filter(p => !(currentPath && (p.path === currentPath || currentPath.startsWith(p.path))))
+      .flatMap(p => p.sessions)
+      .filter(s => s.status !== 'active') // Active shown separately
+      .sort((a, b) => b.lastActivity - a.lastActivity)
+      .slice(0, MAX_RECENT_SESSIONS);
+
+    if (allSessions.length === 0) {
+      return [{
+        type: 'session' as const,
+        label: 'No recent sessions'
+      }];
+    }
+
+    return allSessions.map(session => ({
+      type: 'session' as const,
+      data: session,
+      label: this.truncate(session.displayName, 35)
+    }));
+  }
+
   private async getPlanItems(): Promise<SessionTreeItem[]> {
     const plans = await this.sessionService.getRecentPlans(5);
+
+    if (plans.length === 0) {
+      return [{
+        type: 'plan' as const,
+        label: 'No plans found'
+      }];
+    }
 
     return plans.map(plan => ({
       type: 'plan' as const,
@@ -185,10 +446,23 @@ export class SessionInboxProvider implements vscode.TreeDataProvider<SessionTree
     }));
   }
 
-  private async getProjectItems(): Promise<SessionTreeItem[]> {
-    const projects = await this.sessionService.getProjects();
+  private async getOtherProjectItems(): Promise<SessionTreeItem[]> {
+    const allProjects = await this.sessionService.getProjects();
+    const currentPath = this.getCurrentWorkspacePath();
 
-    return projects.map(project => ({
+    // Filter out current project and limit
+    const otherProjects = allProjects
+      .filter(p => !(currentPath && (p.path === currentPath || currentPath.startsWith(p.path))))
+      .slice(0, MAX_OTHER_PROJECTS);
+
+    if (otherProjects.length === 0) {
+      return [{
+        type: 'project' as const,
+        label: 'No other projects'
+      }];
+    }
+
+    return otherProjects.map(project => ({
       type: 'project' as const,
       data: project,
       label: project.name
@@ -196,7 +470,14 @@ export class SessionInboxProvider implements vscode.TreeDataProvider<SessionTree
   }
 
   private getSessionItems(project: ClaudeProject): SessionTreeItem[] {
-    return project.sessions.map(session => ({
+    // Active first, then recent
+    const active = project.sessions.filter(s => s.status === 'active');
+    const recent = project.sessions
+      .filter(s => s.status !== 'active')
+      .sort((a, b) => b.lastActivity - a.lastActivity)
+      .slice(0, MAX_RECENT_SESSIONS);
+
+    return [...active, ...recent].map(session => ({
       type: 'session' as const,
       data: session,
       label: this.truncate(session.displayName, 30)
@@ -213,6 +494,20 @@ export class SessionInboxProvider implements vscode.TreeDataProvider<SessionTree
         return new vscode.ThemeIcon('check', new vscode.ThemeColor('charts.green'));
       default:
         return new vscode.ThemeIcon('circle-outline');
+    }
+  }
+
+  /**
+   * Get a human-readable label for input-required tools
+   */
+  private getInputToolLabel(tool: string | undefined): string {
+    switch (tool) {
+      case 'AskUserQuestion':
+        return 'Question';
+      case 'ExitPlanMode':
+        return 'Plan Approval';
+      default:
+        return 'Input Required';
     }
   }
 
@@ -238,19 +533,16 @@ export class SessionInboxProvider implements vscode.TreeDataProvider<SessionTree
   }
 
   dispose(): void {
-    // Dispose EventEmitter
     this._onDidChangeTreeData.dispose();
-
-    // Dispose all tracked subscriptions
     this.disposables.forEach(d => d.dispose());
     this.disposables = [];
-
-    // Dispose file watcher
     this.fileWatcher?.dispose();
-
-    // Clear timeout
     if (this.refreshTimeout) {
       clearTimeout(this.refreshTimeout);
     }
+    if (this.liveUpdateInterval) {
+      clearInterval(this.liveUpdateInterval);
+    }
+    this.liveSessionStates.clear();
   }
 }

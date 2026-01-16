@@ -409,6 +409,42 @@ export const MARKDOWN_CSS = `
   .mermaid-comment-btn:hover {
     filter: brightness(1.2);
   }
+
+  /* Text Selection Popup */
+  .selection-popup {
+    position: absolute;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s, visibility 0.15s;
+    pointer-events: none;
+  }
+
+  .selection-popup.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .selection-popup-btn {
+    background: var(--button-bg);
+    color: var(--button-fg);
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    white-space: nowrap;
+  }
+
+  .selection-popup-btn:hover {
+    filter: brightness(1.2);
+  }
 `;
 
 export const LOADING_CSS = `
