@@ -1,8 +1,41 @@
+# Source files (compiled to out/)
+src/**
+tsconfig.json
+
+# Git
+.git/**
+.gitignore
+
+# VS Code
 .vscode/**
 .vscode-test/**
-src/**
-.gitignore
-tsconfig.json
+
+# Build artifacts
 **/*.map
+**/*.ts
+!**/*.d.ts
+
+# Dev dependencies / large packages
 node_modules/@anthropic-ai/**
 node_modules/@img/**
+node_modules/typescript/**
+node_modules/@types/**
+
+# Test files
+**/*.test.js
+**/*.spec.js
+test/**
+tests/**
+
+# Documentation (README stays)
+CHANGELOG.md
+CONTRIBUTING.md
+docs/**
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log
+*.vsix
+.eslintrc*
+.prettierrc*

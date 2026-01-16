@@ -7,7 +7,138 @@ export const MERMAID_INIT = `
     startOnLoad: true,
     theme: 'dark',
     securityLevel: 'loose',
-    flowchart: { useMaxWidth: true }
+    // Flowchart / Graph
+    flowchart: {
+      useMaxWidth: true,
+      htmlLabels: true,
+      curve: 'basis'
+    },
+    // Sequence Diagrams
+    sequence: {
+      useMaxWidth: true,
+      diagramMarginX: 50,
+      diagramMarginY: 10,
+      actorMargin: 50,
+      width: 150,
+      height: 65,
+      boxMargin: 10,
+      boxTextMargin: 5,
+      noteMargin: 10,
+      messageMargin: 35,
+      mirrorActors: true,
+      showSequenceNumbers: false
+    },
+    // Gantt Charts
+    gantt: {
+      useMaxWidth: true,
+      titleTopMargin: 25,
+      barHeight: 20,
+      barGap: 4,
+      topPadding: 50,
+      leftPadding: 75,
+      gridLineStartPadding: 35,
+      fontSize: 11,
+      numberSectionStyles: 4
+    },
+    // Journey Diagrams
+    journey: {
+      useMaxWidth: true,
+      diagramMarginX: 50,
+      diagramMarginY: 10
+    },
+    // Git Graph
+    gitGraph: {
+      useMaxWidth: true,
+      showBranches: true,
+      showCommitLabel: true,
+      mainBranchName: 'main'
+    },
+    // Pie Charts
+    pie: {
+      useMaxWidth: true,
+      textPosition: 0.75
+    },
+    // ER Diagrams
+    er: {
+      useMaxWidth: true,
+      entityPadding: 15,
+      stroke: 'gray',
+      fill: 'honeydew'
+    },
+    // State Diagrams
+    state: {
+      useMaxWidth: true,
+      dividerMargin: 10,
+      sizeUnit: 5,
+      padding: 8,
+      textHeight: 10,
+      titleShift: -15,
+      noteMargin: 10,
+      forkWidth: 70,
+      forkHeight: 7
+    },
+    // Class Diagrams
+    class: {
+      useMaxWidth: true
+    },
+    // Mindmap
+    mindmap: {
+      useMaxWidth: true,
+      padding: 10
+    },
+    // Timeline
+    timeline: {
+      useMaxWidth: true
+    },
+    // Quadrant Chart
+    quadrantChart: {
+      useMaxWidth: true,
+      chartWidth: 500,
+      chartHeight: 500,
+      titleFontSize: 20,
+      titlePadding: 10,
+      quadrantPadding: 5,
+      xAxisLabelPadding: 10,
+      yAxisLabelPadding: 10,
+      xAxisLabelFontSize: 16,
+      yAxisLabelFontSize: 16,
+      quadrantLabelFontSize: 16,
+      quadrantTextTopPadding: 5,
+      pointTextPadding: 5,
+      pointLabelFontSize: 12,
+      pointRadius: 5
+    },
+    // Sankey Diagrams
+    sankey: {
+      useMaxWidth: true,
+      width: 600,
+      height: 400,
+      linkColor: 'gradient',
+      nodeAlignment: 'justify'
+    },
+    // XY Charts
+    xyChart: {
+      useMaxWidth: true,
+      width: 700,
+      height: 500,
+      titleFontSize: 20,
+      titlePadding: 10
+    },
+    // Block Diagrams
+    block: {
+      useMaxWidth: true,
+      padding: 8
+    },
+    // Requirement Diagrams
+    requirement: {
+      useMaxWidth: true
+    },
+    // C4 Diagrams
+    c4: {
+      useMaxWidth: true,
+      diagramMarginX: 50,
+      diagramMarginY: 10
+    }
   });
 `;
 
