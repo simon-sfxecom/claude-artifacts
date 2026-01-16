@@ -201,6 +201,10 @@ export class ArtifactViewProvider implements vscode.WebviewViewProvider, vscode.
     const isApproved = this._state.planApproved;
     const approvalModeText = this._state.approvalMode === 'bypass' ? 'Bypass Mode' : this._state.approvalMode === 'manual' ? 'Manual Mode' : '';
 
+    // Source badge for Claude Code
+    const sourceLabel = 'Claude';
+    const sourceBadgeColor = '#a855f7';
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -254,6 +258,16 @@ export class ArtifactViewProvider implements vscode.WebviewViewProvider, vscode.
       font-size: 10px;
       color: var(--muted);
       opacity: 0.7;
+    }
+
+    .source-badge {
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: ${sourceBadgeColor}22;
+      color: ${sourceBadgeColor};
+      border: 1px solid ${sourceBadgeColor}44;
+      font-weight: 500;
     }
 
     ${MODE_BADGE_CSS}
@@ -384,6 +398,7 @@ export class ArtifactViewProvider implements vscode.WebviewViewProvider, vscode.
   ${fileName ? `
   <div class="header">
     <div class="header-left">
+      <span class="source-badge">${sourceLabel}</span>
       <span class="filename" onclick="openFile()">
         <svg viewBox="0 0 16 16" fill="currentColor">
           <path d="M13.5 3H10V2h3.5A1.5 1.5 0 0115 3.5v10a1.5 1.5 0 01-1.5 1.5h-10A1.5 1.5 0 012 13.5V10h1v3.5a.5.5 0 00.5.5h10a.5.5 0 00.5-.5v-10a.5.5 0 00-.5-.5z"/>

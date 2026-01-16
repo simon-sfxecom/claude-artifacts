@@ -33,39 +33,51 @@ import {
 
 /**
  * Manages artifact webview panels (fullscreen/tab view)
+ * Supports multiple panels for different plans (Split View)
  */
 export class ArtifactPanel {
+  // Map of filePath to panel instance for multi-panel support
+  public static panels: Map<string, ArtifactPanel> = new Map();
+  // Legacy: reference to most recently opened panel
   public static currentPanel: ArtifactPanel | undefined;
   public static readonly viewType = 'claudeArtifacts.artifactPanel';
 
   private readonly _panel: vscode.WebviewPanel;
   private readonly _context: vscode.ExtensionContext;
   private readonly _state: ArtifactState;
+  private readonly _panelId: string;
   private _content: string = '';
   private _filePath: string = '';
   private _mtime: Date | null = null;
   private _disposables: vscode.Disposable[] = [];
 
+  /**
+   * Create or show a panel for a specific plan file
+   * Each unique filePath gets its own panel (Split View support)
+   */
   public static createOrShow(
     context: vscode.ExtensionContext,
     content: string,
     filePath: string,
     mtime: Date | null = null
   ) {
-    const column = vscode.window.activeTextEditor
-      ? vscode.window.activeTextEditor.viewColumn
-      : undefined;
+    const column = vscode.ViewColumn.Beside;
 
-    if (ArtifactPanel.currentPanel) {
-      ArtifactPanel.currentPanel._panel.reveal(column);
-      ArtifactPanel.currentPanel.updateContent(content, filePath, mtime);
+    // Check if panel already exists for this file
+    const existing = ArtifactPanel.panels.get(filePath);
+    if (existing) {
+      existing._panel.reveal(column);
+      existing.updateContent(content, filePath, mtime);
+      ArtifactPanel.currentPanel = existing;
       return;
     }
 
+    // Create new panel
+    const fileName = filePath ? path.basename(filePath, '.md') : 'Plan Preview';
     const panel = vscode.window.createWebviewPanel(
       ArtifactPanel.viewType,
-      'Plan Preview',
-      column || vscode.ViewColumn.One,
+      `📋 ${fileName}`,
+      column,
       {
         enableScripts: true,
         retainContextWhenHidden: true,
@@ -75,7 +87,26 @@ export class ArtifactPanel {
       }
     );
 
-    ArtifactPanel.currentPanel = new ArtifactPanel(panel, context, content, filePath, mtime);
+    const artifactPanel = new ArtifactPanel(panel, context, content, filePath, mtime);
+    ArtifactPanel.panels.set(filePath, artifactPanel);
+    ArtifactPanel.currentPanel = artifactPanel;
+  }
+
+  /**
+   * Get panel by file path
+   */
+  public static getPanel(filePath: string): ArtifactPanel | undefined {
+    return ArtifactPanel.panels.get(filePath);
+  }
+
+  /**
+   * Update all open panels (useful when plan content changes)
+   */
+  public static updateAll(filePath: string, content: string, mtime: Date | null) {
+    const panel = ArtifactPanel.panels.get(filePath);
+    if (panel) {
+      panel.updateContent(content, filePath, mtime);
+    }
   }
 
   private constructor(
@@ -87,7 +118,12 @@ export class ArtifactPanel {
   ) {
     this._panel = panel;
     this._context = context;
-    this._state = new ArtifactState();
+
+    // Extract session ID from plan filename (e.g., "toasty-colecashtari.md" → "toasty-colecashtari")
+    const sessionId = filePath ? path.basename(filePath, '.md') : undefined;
+    this._state = new ArtifactState(sessionId);
+
+    this._panelId = filePath;
     this._content = content;
     this._filePath = filePath;
     this._mtime = mtime;
@@ -112,7 +148,14 @@ export class ArtifactPanel {
   }
 
   public dispose() {
-    ArtifactPanel.currentPanel = undefined;
+    // Remove from panels map
+    ArtifactPanel.panels.delete(this._panelId);
+
+    // Update currentPanel reference
+    if (ArtifactPanel.currentPanel === this) {
+      ArtifactPanel.currentPanel = undefined;
+    }
+
     this._state.dispose();
     this._panel.dispose();
     while (this._disposables.length) {

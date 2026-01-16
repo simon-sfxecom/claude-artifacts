@@ -2,7 +2,7 @@
   "name": "claude-artifacts",
   "displayName": "Claude Artifacts",
   "description": "Live preview of Claude Code plan files with Mermaid diagram support",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "sfx",
   "license": "MIT",
   "repository": {
@@ -37,6 +37,10 @@
     "views": {
       "claude-artifacts": [
         {
+          "id": "claudeArtifacts.sessionInbox",
+          "name": "Sessions"
+        },
+        {
           "type": "webview",
           "id": "claudeArtifacts.artifactView",
           "name": "Plan Preview"
@@ -63,6 +67,12 @@
         "icon": "$(open-preview)"
       },
       {
+        "command": "claudeArtifacts.openPlan",
+        "title": "Open Plan in New Tab",
+        "category": "Claude Artifacts",
+        "icon": "$(split-horizontal)"
+      },
+      {
         "command": "claudeArtifacts.approve",
         "title": "Approve Plan (Bypass)",
         "category": "Claude Artifacts"
@@ -76,6 +86,63 @@
         "command": "claudeArtifacts.sendFeedback",
         "title": "Send Feedback to Claude",
         "category": "Claude Artifacts"
+      },
+      {
+        "command": "claudeArtifacts.refreshSessions",
+        "title": "Refresh Sessions",
+        "category": "Claude Artifacts",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "claudeArtifacts.resumeSession",
+        "title": "Resume Session",
+        "category": "Claude Artifacts",
+        "icon": "$(debug-start)"
+      },
+      {
+        "command": "claudeArtifacts.showSessionDetails",
+        "title": "Show Session Details",
+        "category": "Claude Artifacts"
+      },
+      {
+        "command": "claudeArtifacts.viewWalkthrough",
+        "title": "View Session Summary",
+        "category": "Claude Artifacts",
+        "icon": "$(book)"
+      },
+      {
+        "command": "claudeArtifacts.saveWalkthrough",
+        "title": "Save Session Summary",
+        "category": "Claude Artifacts",
+        "icon": "$(save)"
+      },
+      {
+        "command": "claudeArtifacts.newWorktreeSession",
+        "title": "New Session in Worktree",
+        "category": "Claude Artifacts",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "claudeArtifacts.listWorktrees",
+        "title": "List Worktrees",
+        "category": "Claude Artifacts"
+      },
+      {
+        "command": "claudeArtifacts.removeWorktree",
+        "title": "Remove Worktree",
+        "category": "Claude Artifacts"
+      },
+      {
+        "command": "claudeArtifacts.openChat",
+        "title": "Open Chat Viewer",
+        "category": "Claude Artifacts",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "claudeArtifacts.newChat",
+        "title": "New Claude Chat",
+        "category": "Claude Artifacts",
+        "icon": "$(add)"
       }
     ],
     "keybindings": [
@@ -106,6 +173,38 @@
           "command": "claudeArtifacts.refresh",
           "when": "view == claudeArtifacts.artifactView",
           "group": "navigation"
+        },
+        {
+          "command": "claudeArtifacts.refreshSessions",
+          "when": "view == claudeArtifacts.sessionInbox",
+          "group": "navigation"
+        },
+        {
+          "command": "claudeArtifacts.newChat",
+          "when": "view == claudeArtifacts.sessionInbox",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "claudeArtifacts.resumeSession",
+          "when": "view == claudeArtifacts.sessionInbox && viewItem =~ /^session-/",
+          "group": "inline"
+        },
+        {
+          "command": "claudeArtifacts.viewWalkthrough",
+          "when": "view == claudeArtifacts.sessionInbox && viewItem =~ /^session-/",
+          "group": "session@1"
+        },
+        {
+          "command": "claudeArtifacts.saveWalkthrough",
+          "when": "view == claudeArtifacts.sessionInbox && viewItem =~ /^session-/",
+          "group": "session@2"
+        },
+        {
+          "command": "claudeArtifacts.openChat",
+          "when": "view == claudeArtifacts.sessionInbox && viewItem =~ /^session-/",
+          "group": "inline@2"
         }
       ]
     }
@@ -114,7 +213,10 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src --ext ts",
+    "release": "npm version patch --no-git-tag-version && npx vsce package",
+    "release:minor": "npm version minor --no-git-tag-version && npx vsce package",
+    "release:major": "npm version major --no-git-tag-version && npx vsce package"
   },
   "devDependencies": {
     "@types/node": "^18.0.0",

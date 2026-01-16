@@ -6,7 +6,7 @@ export const MERMAID_INIT = `
   mermaid.initialize({
     startOnLoad: true,
     theme: 'dark',
-    securityLevel: 'loose',
+    securityLevel: 'strict',
     // Flowchart / Graph
     flowchart: {
       useMaxWidth: true,
@@ -204,10 +204,10 @@ export const COMMENT_FUNCTIONS = `
       // Panel mode: card-style comments
       list.innerHTML = comments.map(c => \`
         <div class="comment-card">
-          <div class="comment-meta">\${c.sectionTitle || 'Line ' + c.lineNumber}</div>
+          <div class="comment-meta">\${escapeHtml(c.sectionTitle || 'Line ' + c.lineNumber)}</div>
           <div class="comment-text">\${escapeHtml(c.text)}</div>
           <div class="comment-actions">
-            <button class="comment-action-btn" onclick="deleteComment('\${c.id}')" title="Delete">✕</button>
+            <button class="comment-action-btn" onclick="deleteComment('\${escapeHtml(c.id)}')" title="Delete">✕</button>
           </div>
         </div>
       \`).join('');
@@ -216,8 +216,8 @@ export const COMMENT_FUNCTIONS = `
       list.innerHTML = comments.map(c => \`
         <div class="comment-item">
           <div class="comment-meta">
-            <span>\${c.sectionTitle ? c.sectionTitle : 'Line ' + c.lineNumber}</span>
-            <span class="comment-delete" onclick="deleteComment('\${c.id}')">✕</span>
+            <span>\${escapeHtml(c.sectionTitle ? c.sectionTitle : 'Line ' + c.lineNumber)}</span>
+            <span class="comment-delete" onclick="deleteComment('\${escapeHtml(c.id)}')">✕</span>
           </div>
           <div>\${escapeHtml(c.text)}</div>
         </div>
@@ -339,8 +339,82 @@ export const COMMENT_FUNCTIONS = `
       if (modal && modal.classList.contains('active')) {
         closeModal();
       }
+      // Also hide selection popup
+      const popup = document.getElementById('selectionPopup');
+      if (popup) popup.classList.remove('active');
     }
   });
+
+  // Text selection comment feature
+  let selectedText = '';
+
+  function setupTextSelectionHandler() {
+    const content = document.getElementById('contentArea') || document.getElementById('content');
+    if (!content) return;
+
+    // Create selection popup button
+    let popup = document.getElementById('selectionPopup');
+    if (!popup) {
+      popup = document.createElement('div');
+      popup.id = 'selectionPopup';
+      popup.className = 'selection-popup';
+      popup.innerHTML = '<button class="selection-popup-btn">💬 Comment</button>';
+      document.body.appendChild(popup);
+
+      popup.querySelector('button').onclick = () => {
+        if (selectedText) {
+          currentLineNumber = 0;
+          currentSectionTitle = 'Selected: "' + (selectedText.length > 40 ? selectedText.substring(0, 40) + '...' : selectedText) + '"';
+          document.getElementById('modalSubtitle').textContent = 'Selection';
+          document.getElementById('commentModal').classList.add('active');
+          document.getElementById('commentInput').focus();
+          popup.classList.remove('active');
+        }
+      };
+    }
+
+    // Handle text selection
+    content.addEventListener('mouseup', (e) => {
+      const selection = window.getSelection();
+      const text = selection?.toString().trim();
+
+      if (text && text.length > 0) {
+        selectedText = text;
+
+        // Position popup near selection
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+
+        popup.style.top = (rect.top + window.scrollY - 40) + 'px';
+        popup.style.left = (rect.left + window.scrollX + (rect.width / 2) - 50) + 'px';
+        popup.classList.add('active');
+      } else {
+        // Small delay to allow clicking the popup button
+        setTimeout(() => {
+          if (!popup.matches(':hover')) {
+            popup.classList.remove('active');
+            selectedText = '';
+          }
+        }, 200);
+      }
+    });
+
+    // Hide popup when clicking elsewhere
+    document.addEventListener('mousedown', (e) => {
+      if (!popup.contains(e.target) && e.target !== popup) {
+        setTimeout(() => {
+          const selection = window.getSelection();
+          if (!selection?.toString().trim()) {
+            popup.classList.remove('active');
+            selectedText = '';
+          }
+        }, 10);
+      }
+    });
+  }
+
+  // Call setup after DOM is ready
+  setupTextSelectionHandler();
 `;
 
 export const MERMAID_RENDER = `
