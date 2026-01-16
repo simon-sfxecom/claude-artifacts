@@ -1,0 +1,119 @@
+{
+  "name": "claude-artifacts",
+  "displayName": "Claude Artifacts",
+  "description": "Live preview of Claude Code plan files with Mermaid diagram support",
+  "version": "0.1.0",
+  "publisher": "sfx",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claude-artifacts",
+          "title": "Claude Artifacts",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "claude-artifacts": [
+        {
+          "type": "webview",
+          "id": "claudeArtifacts.artifactView",
+          "name": "Plan Preview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "claudeArtifacts.refresh",
+        "title": "Refresh Artifact View",
+        "category": "Claude Artifacts",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "claudeArtifacts.openPlanFile",
+        "title": "Open Current Plan File",
+        "category": "Claude Artifacts",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "claudeArtifacts.openInTab",
+        "title": "Open Artifact in Tab",
+        "category": "Claude Artifacts",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "claudeArtifacts.approve",
+        "title": "Approve Plan (Bypass)",
+        "category": "Claude Artifacts"
+      },
+      {
+        "command": "claudeArtifacts.approveManual",
+        "title": "Approve Plan (Manual)",
+        "category": "Claude Artifacts"
+      },
+      {
+        "command": "claudeArtifacts.sendFeedback",
+        "title": "Send Feedback to Claude",
+        "category": "Claude Artifacts"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "claudeArtifacts.approve",
+        "key": "ctrl+shift+1",
+        "mac": "cmd+shift+1"
+      },
+      {
+        "command": "claudeArtifacts.approveManual",
+        "key": "ctrl+shift+2",
+        "mac": "cmd+shift+2"
+      },
+      {
+        "command": "claudeArtifacts.sendFeedback",
+        "key": "ctrl+shift+3",
+        "mac": "cmd+shift+3"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "claudeArtifacts.openInTab",
+          "when": "view == claudeArtifacts.artifactView",
+          "group": "navigation"
+        },
+        {
+          "command": "claudeArtifacts.refresh",
+          "when": "view == claudeArtifacts.artifactView",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.74.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-code": "^2.1.7",
+    "marked": "^12.0.0"
+  }
+}
