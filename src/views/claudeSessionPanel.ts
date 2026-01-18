@@ -18,7 +18,7 @@ export class ClaudeSessionPanel {
   private readonly _extensionUri: vscode.Uri;
   private readonly _session: ClaudeSession;
   private _ptySession: PTYSession | undefined;
-  private _disposables: vscode.Disposable[] = [];;
+  private _disposables: vscode.Disposable[] = [];
   private _planUpdateListener: vscode.Disposable | undefined;
 
   /**
