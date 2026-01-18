@@ -115,7 +115,7 @@ jobs:
           echo "✅ VSIX package created: $VSIX_FILE"
 
       - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         env:
           NODE_VERSION: ${{ matrix.node-version }}
         with:
@@ -137,7 +137,7 @@ jobs:
           node-version: '20'
 
       - name: Download VSIX artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vsix-node-20
 
