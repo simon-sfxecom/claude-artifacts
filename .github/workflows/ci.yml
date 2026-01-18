@@ -143,7 +143,7 @@ jobs:
 
       - name: Install VS Code CLI
         run: |
-          wget -q https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64 -O vscode-cli.tar.gz
+          wget -q "https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64" -O vscode-cli.tar.gz
           tar -xzf vscode-cli.tar.gz
           chmod +x code
 
