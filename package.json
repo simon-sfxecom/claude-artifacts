@@ -2,7 +2,7 @@
   "name": "claude-artifacts",
   "displayName": "Claude Artifacts",
   "description": "Live preview of Claude Code plan files with Mermaid diagram support",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "sfx",
   "license": "MIT",
   "repository": {
