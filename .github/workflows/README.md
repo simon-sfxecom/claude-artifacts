@@ -100,6 +100,20 @@ npx vsce package --allow-missing-repository
 code --install-extension claude-artifacts-*.vsix
 ```
 
+### Testing with code-server
+
+If testing with code-server, use environment variables for credentials:
+
+```bash
+# Set password via environment variable
+export CODE_SERVER_PASSWORD="your-password-here"
+
+# Use in scripts
+const password = process.env.CODE_SERVER_PASSWORD || 'default-password';
+```
+
+**Never commit hardcoded credentials to the repository.**
+
 ---
 
 ## Troubleshooting

@@ -22,3 +22,9 @@ npm-debug.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Walkthrough media (binary files)
+docs/walkthroughs/**/*.webm
+docs/walkthroughs/**/*.png
+docs/walkthroughs/**/*.jpg
+docs/walkthroughs/**/*.mp4
