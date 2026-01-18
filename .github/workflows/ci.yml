@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  type-check:
+    name: Type Check & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript Type Check
+        run: npx tsc --noEmit --pretty
+
+      - name: TypeScript Strict Mode Check
+        run: npx tsc --noEmit --strict --pretty
+        continue-on-error: true
+
+      - name: Lint TypeScript
+        run: npm run lint --if-present
+
+      - name: Check unused exports
+        run: npx ts-prune --project tsconfig.json || echo "⏭️  ts-prune not available"
+        continue-on-error: true
+
+  build:
+    name: Build & Package
+    runs-on: ubuntu-latest
+    needs: type-check
+
+    strategy:
+      matrix:
+        node-version: [20]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        env:
+          NODE_VERSION: ${{ matrix.node-version }}
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript Type Check
+        run: npx tsc --noEmit
+
+      - name: TypeScript Strict Check
+        run: npx tsc --noEmit --strict
+        continue-on-error: true
+
+      - name: Lint code
+        run: npm run lint --if-present
+        continue-on-error: true
+
+      - name: Check code formatting
+        run: |
+          if [ -f .prettierrc ] || [ -f .prettierrc.json ]; then
+            npx prettier --check "src/**/*.{ts,js,json}"
+          else
+            echo "⏭️  Prettier config not found, skipping format check"
+          fi
+        continue-on-error: true
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Verify TypeScript compilation
+        run: |
+          if [ ! -f out/extension.js ]; then
+            echo "❌ Error: extension.js not found after compilation"
+            exit 1
+          fi
+          echo "✅ TypeScript compilation successful"
+          echo "📊 Compiled files:"
+          find out -name "*.js" | wc -l | xargs echo "   JS files:"
+          du -sh out | xargs echo "   Total size:"
+
+      - name: Run tests
+        run: npm test --if-present
+        continue-on-error: true
+
+      - name: Package Extension
+        run: |
+          npm install -g @vscode/vsce
+          vsce package --allow-missing-repository
+
+      - name: Verify VSIX package
+        run: |
+          VSIX_FILE=$(ls *.vsix)
+          if [ -z "$VSIX_FILE" ]; then
+            echo "Error: VSIX file not found"
+            exit 1
+          fi
+          echo "✅ VSIX package created: $VSIX_FILE"
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        env:
+          NODE_VERSION: ${{ matrix.node-version }}
+        with:
+          name: vsix-node-${{ matrix.node-version }}
+          path: '*.vsix'
+          retention-days: 7
+

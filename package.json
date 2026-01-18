@@ -2,7 +2,7 @@
   "name": "claude-artifacts",
   "displayName": "Claude Artifacts",
   "description": "Live preview of Claude Code plan files with Mermaid diagram support",
-  "version": "0.1.1",
+  "version": "0.1.5",
   "publisher": "sfx",
   "license": "MIT",
   "repository": {
@@ -48,6 +48,12 @@
       ]
     },
     "commands": [
+      {
+        "command": "claudeArtifacts.showMissionControl",
+        "title": "Open Mission Control",
+        "category": "Claude Artifacts",
+        "icon": "$(dashboard)"
+      },
       {
         "command": "claudeArtifacts.refresh",
         "title": "Refresh Artifact View",
@@ -143,9 +149,44 @@
         "title": "New Claude Chat",
         "category": "Claude Artifacts",
         "icon": "$(add)"
+      },
+      {
+        "command": "claudeArtifacts.openSessionInTab",
+        "title": "Open Session in Tab",
+        "category": "Claude Artifacts",
+        "icon": "$(window)"
+      },
+      {
+        "command": "claudeArtifacts.startRecording",
+        "title": "Start Screen Recording",
+        "category": "Claude Artifacts",
+        "icon": "$(record)"
+      },
+      {
+        "command": "claudeArtifacts.stopRecording",
+        "title": "Stop Screen Recording",
+        "category": "Claude Artifacts",
+        "icon": "$(stop)"
+      },
+      {
+        "command": "claudeArtifacts.captureScreenshot",
+        "title": "Capture Screenshot",
+        "category": "Claude Artifacts",
+        "icon": "$(device-camera)"
+      },
+      {
+        "command": "claudeArtifacts.viewWalkthroughText",
+        "title": "View Session Summary (Text)",
+        "category": "Claude Artifacts",
+        "icon": "$(book)"
       }
     ],
     "keybindings": [
+      {
+        "command": "claudeArtifacts.showMissionControl",
+        "key": "ctrl+shift+m",
+        "mac": "cmd+shift+m"
+      },
       {
         "command": "claudeArtifacts.approve",
         "key": "ctrl+shift+1",
@@ -187,9 +228,14 @@
       ],
       "view/item/context": [
         {
-          "command": "claudeArtifacts.resumeSession",
+          "command": "claudeArtifacts.openSessionInTab",
           "when": "view == claudeArtifacts.sessionInbox && viewItem =~ /^session-/",
           "group": "inline"
+        },
+        {
+          "command": "claudeArtifacts.resumeSession",
+          "when": "view == claudeArtifacts.sessionInbox && viewItem =~ /^session-/",
+          "group": "session@0"
         },
         {
           "command": "claudeArtifacts.viewWalkthrough",
@@ -205,6 +251,21 @@
           "command": "claudeArtifacts.openChat",
           "when": "view == claudeArtifacts.sessionInbox && viewItem =~ /^session-/",
           "group": "inline@2"
+        },
+        {
+          "command": "claudeArtifacts.startRecording",
+          "when": "view == claudeArtifacts.sessionInbox && viewItem =~ /^session-/",
+          "group": "media@1"
+        },
+        {
+          "command": "claudeArtifacts.stopRecording",
+          "when": "view == claudeArtifacts.sessionInbox && viewItem =~ /^session-/",
+          "group": "media@2"
+        },
+        {
+          "command": "claudeArtifacts.captureScreenshot",
+          "when": "view == claudeArtifacts.sessionInbox && viewItem =~ /^session-/",
+          "group": "media@3"
         }
       ]
     }
@@ -213,7 +274,11 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "lint": "eslint src --ext ts",
+    "type-check": "tsc --noEmit",
+    "type-check:strict": "tsc --noEmit --strict",
+    "lint": "eslint src --ext ts --max-warnings 50",
+    "lint:check": "which eslint > /dev/null && npm run lint || echo '⏭️  ESLint not installed, skipping lint'",
+    "ci": "npm run type-check && npm run lint:check && npm run compile",
     "release": "npm version patch --no-git-tag-version && npx vsce package",
     "release:minor": "npm version minor --no-git-tag-version && npx vsce package",
     "release:major": "npm version major --no-git-tag-version && npx vsce package"
@@ -221,10 +286,22 @@
   "devDependencies": {
     "@types/node": "^18.0.0",
     "@types/vscode": "^1.74.0",
+    "@typescript-eslint/eslint-plugin": "^8.53.0",
+    "@typescript-eslint/parser": "^8.53.0",
+    "eslint": "^8.57.1",
     "typescript": "^5.0.0"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^2.1.7",
-    "marked": "^12.0.0"
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/addon-webgl": "^0.18.0",
+    "@xterm/xterm": "^5.5.0",
+    "archiver": "^7.0.1",
+    "marked": "^12.0.0",
+    "node-pty": "^1.0.0",
+    "screenshot-desktop": "^1.15.3"
+  },
+  "optionalDependencies": {
+    "sharp": "^0.33.0"
   }
 }

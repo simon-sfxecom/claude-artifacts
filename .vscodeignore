@@ -5,6 +5,7 @@ tsconfig.json
 # Git
 .git/**
 .gitignore
+.github/**
 
 # VS Code
 .vscode/**
@@ -27,10 +28,22 @@ node_modules/@types/**
 test/**
 tests/**
 
-# Documentation (README stays)
-CHANGELOG.md
+# Documentation (keep README.md and CHANGELOG.md)
 CONTRIBUTING.md
 docs/**
+FINAL_STATUS.md
+TESTING_REPORT.md
+VALIDATION_REPORT.md
+*_REPORT.md
+
+# Media files (binary files)
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.gif
+**/*.webm
+**/*.mp4
+**/*.avi
 
 # Misc
 .DS_Store
