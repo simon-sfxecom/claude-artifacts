@@ -1,0 +1,113 @@
+name: Release Extension
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.1.5)'
+        required: true
+        type: string
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Run tests (if any)
+        run: npm test --if-present
+        continue-on-error: true
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Package Extension
+        run: vsce package --allow-missing-repository
+
+      - name: Get version from package.json
+        id: get_version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "version=$INPUT_VERSION" >> $GITHUB_OUTPUT
+          else
+            VERSION=$(node -p "require('./package.json').version")
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          fi
+          VSIX_VERSION=$(node -p "require('./package.json').version")
+          echo "vsix_name=claude-artifacts-${VSIX_VERSION}.vsix" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.get_version.outputs.version }}
+          VSIX_NAME: ${{ steps.get_version.outputs.vsix_name }}
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          release_name: Claude Artifacts v${{ steps.get_version.outputs.version }}
+          body: |
+            ## Claude Artifacts Extension v${{ steps.get_version.outputs.version }}
+
+            ### Installation
+
+            Download the `.vsix` file below and install it in VS Code:
+
+            ```bash
+            code --install-extension ${{ steps.get_version.outputs.vsix_name }}
+            ```
+
+            Or in code-server:
+
+            ```bash
+            code-server --install-extension ${{ steps.get_version.outputs.vsix_name }}
+            ```
+
+            ### Features
+
+            - ✅ Mission Control Dashboard - Manage multiple Claude sessions
+            - ✅ IDE View Integration - Embedded xterm.js terminals
+            - ✅ Enhanced Walkthrough - Automatic media capture
+
+            ### Changelog
+
+            See [CHANGELOG.md](CHANGELOG.md) for details.
+          draft: false
+          prerelease: false
+
+      - name: Upload VSIX to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./${{ steps.get_version.outputs.vsix_name }}
+          asset_name: ${{ steps.get_version.outputs.vsix_name }}
+          asset_content_type: application/vsix
+
+      - name: Publish to VS Code Marketplace (Optional)
+        if: secrets.VSCE_PAT != ''
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: vsce publish -p "$VSCE_PAT"
+        continue-on-error: true

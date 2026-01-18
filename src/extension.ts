@@ -4,14 +4,21 @@ import * as os from 'os';
 import { ArtifactViewProvider } from './artifactViewProvider';
 import { ArtifactPanel } from './artifactPanel';
 import { SessionInboxProvider } from './views/sessionInboxProvider';
+import { MissionControlPanel } from './views/missionControlPanel';
 import { ClaudeSession } from './models/session';
 import { getWorktreeService } from './services/worktreeService';
 import { getWalkthroughGenerator } from './services/walkthroughGenerator';
 import { SessionDetailPanel } from './views/sessionDetailPanel';
 import { ChatViewerPanel } from './views/chatViewerPanel';
+import { ClaudeSessionPanel } from './views/claudeSessionPanel';
+import { WalkthroughViewerPanel } from './views/walkthroughViewerPanel';
 import { getSessionService } from './services/sessionService';
 import { getPlanService, disposePlanService, Plan } from './services/planService';
 import { registerSessionTerminal, disposeTerminalTracking } from './claudeService';
+import { disposePTYManager } from './services/ptyManager';
+import { getMediaCaptureService } from './services/mediaCaptureService';
+import { getSessionMonitor, disposeSessionMonitor } from './services/sessionMonitor';
+import { getVideoRecordingService, disposeVideoRecordingService } from './services/videoRecordingService';
 
 // Allowed plans directory for path validation
 const PLANS_DIR = path.join(os.homedir(), '.claude', 'plans');
@@ -50,6 +57,16 @@ function extractSession(arg: unknown): ClaudeSession | null {
 export function activate(context: vscode.ExtensionContext) {
   console.log('Claude Artifacts extension is now active');
 
+  // Initialize Phase 3 services
+  const mediaCaptureService = getMediaCaptureService();
+  mediaCaptureService.initialize();
+
+  const sessionMonitor = getSessionMonitor();
+  sessionMonitor.autoMonitorActiveSessions();
+
+  const videoRecordingService = getVideoRecordingService();
+  videoRecordingService.initialize();
+
   // Create the webview provider
   const artifactViewProvider = new ArtifactViewProvider(context);
 
@@ -68,6 +85,13 @@ export function activate(context: vscode.ExtensionContext) {
       'claudeArtifacts.sessionInbox',
       sessionInboxProvider
     )
+  );
+
+  // Register Mission Control command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('claudeArtifacts.showMissionControl', () => {
+      MissionControlPanel.createOrShow(context.extensionUri);
+    })
   );
 
   // Create and start the plan service for Claude Code
@@ -241,14 +265,40 @@ export function activate(context: vscode.ExtensionContext) {
       }
       ChatViewerPanel.createOrShow(session, context.extensionUri);
     }),
+    vscode.commands.registerCommand('claudeArtifacts.openSessionInTab', (arg: unknown) => {
+      const session = extractSession(arg);
+      if (!session) {
+        vscode.window.showWarningMessage('No session selected');
+        return;
+      }
+      if (!isValidSessionId(session.id)) {
+        vscode.window.showErrorMessage('Invalid session ID format');
+        return;
+      }
+      ClaudeSessionPanel.createOrShow(context.extensionUri, session);
+    }),
     vscode.commands.registerCommand('claudeArtifacts.newChat', () => {
       const workingDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      const terminal = vscode.window.createTerminal({
-        name: 'Claude: New Chat',
-        cwd: workingDir
-      });
-      terminal.show();
-      terminal.sendText('claude');
+      if (!workingDir) {
+        vscode.window.showErrorMessage('No workspace folder open');
+        return;
+      }
+
+      // Create a temporary session object for the new chat
+      const newSessionId = `new-chat-${Date.now()}`;
+      const tempSession: ClaudeSession = {
+        id: newSessionId,
+        displayName: 'New Chat',
+        projectPath: workingDir,
+        planFile: '', // Will be populated once Claude creates a session
+        status: 'active' as const,
+        createdAt: Date.now(),
+        lastActivity: Date.now(),
+        messageCount: 0
+      };
+
+      // Open in UI Tab (xterm.js wrapper)
+      ClaudeSessionPanel.createOrShow(context.extensionUri, tempSession);
     })
   );
 
@@ -262,6 +312,21 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
       try {
+        // Open rich media viewer
+        await WalkthroughViewerPanel.createOrShow(context.extensionUri, session);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to open walkthrough: ${msg}`);
+      }
+    }),
+    vscode.commands.registerCommand('claudeArtifacts.viewWalkthroughText', async (arg: unknown) => {
+      const session = extractSession(arg);
+      if (!session) {
+        vscode.window.showWarningMessage('No session selected');
+        return;
+      }
+      try {
+        // Old text-based walkthrough
         await walkthroughGenerator.showWalkthrough(session.id, session.projectPath);
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -388,6 +453,57 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Recording and capture commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand('claudeArtifacts.startRecording', async (arg: unknown) => {
+      const session = extractSession(arg);
+      if (!session) {
+        vscode.window.showWarningMessage('No session selected');
+        return;
+      }
+      await videoRecordingService.startRecording(session.id, session.projectPath);
+    }),
+    vscode.commands.registerCommand('claudeArtifacts.stopRecording', async (arg: unknown) => {
+      // If called from status bar, stop all recordings
+      if (!arg) {
+        const recordings = videoRecordingService.getActiveRecordings();
+        if (recordings.length === 0) {
+          vscode.window.showWarningMessage('No recordings in progress');
+          return;
+        }
+
+        const choice = await vscode.window.showQuickPick(
+          recordings.map(r => ({
+            label: r.sessionId,
+            description: 'Stop recording',
+            sessionId: r.sessionId
+          })),
+          { placeHolder: 'Select recording to stop' }
+        );
+
+        if (choice) {
+          await videoRecordingService.stopRecording(choice.sessionId);
+        }
+        return;
+      }
+
+      const session = extractSession(arg);
+      if (!session) {
+        vscode.window.showWarningMessage('No session selected');
+        return;
+      }
+      await videoRecordingService.stopRecording(session.id);
+    }),
+    vscode.commands.registerCommand('claudeArtifacts.captureScreenshot', async (arg: unknown) => {
+      const session = extractSession(arg);
+      if (!session) {
+        vscode.window.showWarningMessage('No session selected');
+        return;
+      }
+      await sessionMonitor.manualCapture(session.id, session.projectPath);
+    })
+  );
+
   // Create status bar item for active sessions
   statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   statusBarItem.command = 'claudeArtifacts.refreshSessions';
@@ -441,4 +557,7 @@ export function activate(context: vscode.ExtensionContext) {
 export function deactivate() {
   disposePlanService();
   disposeTerminalTracking();
+  disposePTYManager();
+  disposeSessionMonitor();
+  disposeVideoRecordingService();
 }
