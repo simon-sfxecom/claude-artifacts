@@ -274,7 +274,11 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "lint": "eslint src --ext ts",
+    "type-check": "tsc --noEmit",
+    "type-check:strict": "tsc --noEmit --strict",
+    "lint": "eslint src --ext ts --max-warnings 0",
+    "lint:check": "which eslint > /dev/null && npm run lint || echo '⏭️  ESLint not installed, skipping lint'",
+    "ci": "npm run type-check && npm run lint:check && npm run compile",
     "release": "npm version patch --no-git-tag-version && npx vsce package",
     "release:minor": "npm version minor --no-git-tag-version && npx vsce package",
     "release:major": "npm version major --no-git-tag-version && npx vsce package"

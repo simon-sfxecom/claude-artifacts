@@ -1,5 +1,10 @@
 # Claude Artifacts
 
+[![CI](https://github.com/simon-sfxecom/claude-artifacts/actions/workflows/ci.yml/badge.svg)](https://github.com/simon-sfxecom/claude-artifacts/actions/workflows/ci.yml)
+[![Release](https://github.com/simon-sfxecom/claude-artifacts/actions/workflows/release.yml/badge.svg)](https://github.com/simon-sfxecom/claude-artifacts/actions/workflows/release.yml)
+[![Version](https://img.shields.io/github/v/release/simon-sfxecom/claude-artifacts?label=version)](https://github.com/simon-sfxecom/claude-artifacts/releases)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A VS Code extension for managing Claude Code sessions with Mission Control dashboard, embedded terminals, automatic screenshot capture, and rich media walkthroughs.
 
 ## ✨ Features

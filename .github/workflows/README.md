@@ -9,20 +9,32 @@ This directory contains automated workflows for the Claude Artifacts extension.
 **Triggers**: Push to `main`/`develop` branches, Pull Requests
 
 **Jobs**:
-1. **Build** (Matrix: Node 18, 20)
+1. **Type Check & Lint**
+   - TypeScript type checking (`tsc --noEmit`)
+   - Strict mode check (optional, shows warnings)
+   - ESLint validation
+   - Unused exports check (via ts-prune)
+   - **Blocks build if types are invalid**
+
+2. **Build & Package** (Matrix: Node 18, 20)
    - Install dependencies
+   - TypeScript type check
+   - Code formatting check (Prettier, if configured)
    - Lint code
    - Compile TypeScript
    - Package VSIX
    - Upload artifacts
+   - **Runs only if type-check passes**
 
-2. **Validate**
+3. **Validate**
    - Download VSIX
    - Install VS Code CLI
    - Install extension
    - Verify installation
 
-**Purpose**: Ensures code quality and successful builds on every push/PR.
+**Purpose**: Ensures code quality, type safety, and successful builds on every push/PR.
+
+**Badge**: [![CI](https://github.com/simon-sfxecom/claude-artifacts/actions/workflows/ci.yml/badge.svg)](https://github.com/simon-sfxecom/claude-artifacts/actions/workflows/ci.yml)
 
 ---
 
@@ -84,14 +96,31 @@ Personal Access Token for publishing to VS Code Marketplace.
 
 ## Local Testing
 
-Test the build locally before pushing:
+### Quick Quality Check
+
+Run all CI checks locally before pushing:
+
+```bash
+# Run all checks (type-check, lint, compile)
+npm run ci
+
+# Or run individually:
+npm run type-check        # TypeScript type checking
+npm run type-check:strict # Strict mode (optional)
+npm run lint              # ESLint
+npm run compile           # Build
+```
+
+### Full Build & Package
+
+Test the complete build pipeline:
 
 ```bash
 # Install dependencies
 npm ci
 
-# Compile TypeScript
-npm run compile
+# Run quality checks
+npm run ci
 
 # Package VSIX
 npx vsce package --allow-missing-repository
