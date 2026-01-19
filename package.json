@@ -271,14 +271,21 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "check-types": "tsc --noEmit",
     "type-check": "tsc --noEmit",
     "type-check:strict": "tsc --noEmit --strict",
     "lint": "eslint src --ext ts --max-warnings 50",
     "lint:check": "which eslint > /dev/null && npm run lint || echo '⏭️  ESLint not installed, skipping lint'",
-    "ci": "npm run type-check && npm run lint:check && npm run compile",
+    "ci": "npm run type-check && npm run lint:check && npm run package",
     "release": "npm version patch --no-git-tag-version && npx vsce package",
     "release:minor": "npm version minor --no-git-tag-version && npx vsce package",
     "release:major": "npm version major --no-git-tag-version && npx vsce package"
@@ -288,7 +295,9 @@
     "@types/vscode": "^1.74.0",
     "@typescript-eslint/eslint-plugin": "^8.53.0",
     "@typescript-eslint/parser": "^8.53.0",
+    "esbuild": "^0.27.2",
     "eslint": "^8.57.1",
+    "npm-run-all": "^4.1.5",
     "typescript": "^5.0.0"
   },
   "dependencies": {

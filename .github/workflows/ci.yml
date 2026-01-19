@@ -82,19 +82,20 @@ jobs:
           fi
         continue-on-error: true
 
-      - name: Compile TypeScript
-        run: npm run compile
+      - name: Build Extension (esbuild)
+        run: npm run package
 
-      - name: Verify TypeScript compilation
+      - name: Verify build output
         run: |
           if [ ! -f out/extension.js ]; then
-            echo "❌ Error: extension.js not found after compilation"
+            echo "❌ Error: extension.js not found after build"
             exit 1
           fi
-          echo "✅ TypeScript compilation successful"
-          echo "📊 Compiled files:"
-          find out -name "*.js" | wc -l | xargs echo "   JS files:"
-          du -sh out | xargs echo "   Total size:"
+          echo "✅ Extension build successful"
+          echo "📊 Build output:"
+          ls -lh out/extension.js | awk '{print "   Bundled size:", $5}'
+          echo "   Output directory:"
+          du -sh out | xargs echo "    "
 
       - name: Run tests
         run: npm test --if-present
