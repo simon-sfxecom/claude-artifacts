@@ -11,6 +11,7 @@ import {
   getRelativeTime,
   CSS_VARIABLES,
   MODE_BADGE_CSS,
+  SESSION_INFO_CSS,
   ACTION_BUTTON_CSS,
   MARKDOWN_CSS,
   LOADING_CSS,
@@ -22,6 +23,8 @@ import {
   MESSAGE_HANDLER,
   ICONS,
   generateApprovalBanner,
+  generateSessionInfoHeader,
+  SessionDisplayInfo,
   generatePanelActionButtons,
   generateCommentModal,
   generateBottomBar,
@@ -30,6 +33,7 @@ import {
   generateScriptFooter,
   generateLoadingOverlay
 } from './shared';
+import { getSessionTerminal } from './claudeService';
 
 /**
  * Manages artifact webview panels (fullscreen/tab view)
@@ -233,7 +237,15 @@ export class ArtifactPanel {
     const approveBtn = getApproveButtonLabel(this._state.permissionMode);
     const modeIndicator = getModeIndicator(this._state.permissionMode);
     const isApproved = this._state.planApproved;
-    const approvalModeText = this._state.approvalMode === 'bypass' ? 'Bypass Mode' : this._state.approvalMode === 'manual' ? 'Manual Mode' : '';
+    const approvalModeText = this._state.approvalMode === 'bypassClear' ? 'Bypass + Clear' : this._state.approvalMode === 'bypass' ? 'Bypass Mode' : this._state.approvalMode === 'manual' ? 'Manual Mode' : '';
+
+    // Session info - extract session ID from plan filename
+    const sessionId = this._filePath ? path.basename(this._filePath, '.md') : undefined;
+    const sessionInfo: SessionDisplayInfo | undefined = sessionId ? {
+      sessionId,
+      lastActivity: timeAgo || undefined,
+      isConnected: getSessionTerminal(sessionId) !== undefined
+    } : undefined;
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -291,6 +303,8 @@ export class ArtifactPanel {
     .toolbar-time svg { width: 14px; height: 14px; }
 
     ${MODE_BADGE_CSS}
+
+    ${SESSION_INFO_CSS}
 
     .action-buttons {
       display: flex;
@@ -626,6 +640,8 @@ export class ArtifactPanel {
     </div>
     ${generatePanelActionButtons(approveBtn, hasComments, this._state.comments.length, isApproved)}
   </div>
+
+  ${generateSessionInfoHeader(sessionInfo)}
 
   ${generateApprovalBanner(isApproved, approvalModeText)}
 

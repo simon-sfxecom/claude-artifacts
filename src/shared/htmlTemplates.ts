@@ -35,6 +35,43 @@ export const ICONS = {
 };
 
 /**
+ * Session info for display
+ */
+export interface SessionDisplayInfo {
+  sessionId: string;
+  projectName?: string;
+  lastActivity?: string;
+  isConnected: boolean;
+}
+
+/**
+ * Generate session info header HTML
+ * Shows which Claude session created the plan and connection status
+ */
+export function generateSessionInfoHeader(info: SessionDisplayInfo | undefined): string {
+  if (!info) {
+    return '';
+  }
+
+  const connectionStatus = info.isConnected
+    ? '<span class="connection-status connected">Connected</span>'
+    : '<span class="connection-status disconnected">No terminal</span>';
+
+  return `
+  <div class="session-info">
+    <div class="session-info-left">
+      <span class="session-label">Session:</span>
+      <span class="session-id">${info.sessionId}</span>
+      ${info.projectName ? `<span class="session-project">${info.projectName}</span>` : ''}
+    </div>
+    <div class="session-info-right">
+      ${info.lastActivity ? `<span class="session-activity">${info.lastActivity}</span>` : ''}
+      ${connectionStatus}
+    </div>
+  </div>`;
+}
+
+/**
  * Generate approval banner HTML
  */
 export function generateApprovalBanner(isApproved: boolean, approvalModeText: string): string {
@@ -48,6 +85,11 @@ export function generateApprovalBanner(isApproved: boolean, approvalModeText: st
 
 /**
  * Generate action buttons HTML for sidebar
+ * New Claude options (as of 2025):
+ * 1. Bypass and Clear Context
+ * 2. Bypass
+ * 3. Manual Edit/Accept
+ * 4. Feedback
  */
 export function generateSidebarActionButtons(
   approveBtn: ButtonLabel,
@@ -59,15 +101,19 @@ export function generateSidebarActionButtons(
 
   return `
   <div class="action-bar${isApproved ? ' approved' : ''}">
-    <button class="action-btn primary" onclick="approve()" title="${approveBtn.tooltip}"${disabledAttr}>
+    <button class="action-btn primary clear" onclick="approveBypassClear()" title="Bypass permissions and clear context (Option 1)"${disabledAttr}>
       ${ICONS.checkmark}
-      ${approveBtn.text}
+      Bypass+Clear
     </button>
-    <button class="action-btn secondary" onclick="approveManual()" title="Yes, manually approve edits (Option 2)"${disabledAttr}>
+    <button class="action-btn primary" onclick="approve()" title="Bypass permissions (Option 2)"${disabledAttr}>
+      ${ICONS.checkmark}
+      Bypass
+    </button>
+    <button class="action-btn secondary" onclick="approveManual()" title="Manually approve edits (Option 3)"${disabledAttr}>
       ${ICONS.pencil}
       Manual
     </button>
-    <button class="action-btn feedback" onclick="sendFeedback()" title="Send comments to Claude (Option 3)"${disabledAttr}>
+    <button class="action-btn feedback" onclick="sendFeedback()" title="Send feedback to Claude (Option 4)"${disabledAttr}>
       ${ICONS.comment}
       Feedback
       ${hasComments ? `<span class="badge">${commentCount}</span>` : ''}
@@ -77,6 +123,11 @@ export function generateSidebarActionButtons(
 
 /**
  * Generate action buttons HTML for panel toolbar
+ * New Claude options (as of 2025):
+ * 1. Bypass and Clear Context
+ * 2. Bypass
+ * 3. Manual Edit/Accept
+ * 4. Feedback
  */
 export function generatePanelActionButtons(
   approveBtn: ButtonLabel,
@@ -88,15 +139,19 @@ export function generatePanelActionButtons(
 
   return `
   <div class="action-buttons${isApproved ? ' approved' : ''}">
-    <button class="action-btn primary" onclick="approve()" title="${approveBtn.tooltip}"${disabledAttr}>
+    <button class="action-btn primary clear" onclick="approveBypassClear()" title="Bypass permissions and clear context (Option 1)"${disabledAttr}>
       ${ICONS.checkmark}
-      ${approveBtn.text}
+      Bypass+Clear
     </button>
-    <button class="action-btn secondary" onclick="approveManual()" title="Yes, manually approve edits (Option 2)"${disabledAttr}>
+    <button class="action-btn primary" onclick="approve()" title="Bypass permissions (Option 2)"${disabledAttr}>
+      ${ICONS.checkmark}
+      Bypass
+    </button>
+    <button class="action-btn secondary" onclick="approveManual()" title="Manually approve edits (Option 3)"${disabledAttr}>
       ${ICONS.pencil}
       Manual
     </button>
-    <button class="action-btn feedback ${hasComments ? 'has-comments' : ''}" onclick="sendFeedback()" title="Send comments to Claude (Option 3)"${disabledAttr}>
+    <button class="action-btn feedback ${hasComments ? 'has-comments' : ''}" onclick="sendFeedback()" title="Send feedback to Claude (Option 4)"${disabledAttr}>
       ${ICONS.comment}
       Feedback
       ${hasComments ? `<span class="badge">${commentCount}</span>` : ''}

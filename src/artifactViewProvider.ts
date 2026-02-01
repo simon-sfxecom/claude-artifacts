@@ -11,6 +11,7 @@ import {
   getRelativeTime,
   CSS_VARIABLES,
   MODE_BADGE_CSS,
+  SESSION_INFO_CSS,
   HEADER_CSS,
   MARKDOWN_CSS,
   MERMAID_INIT,
@@ -22,12 +23,15 @@ import {
   ICONS,
   generateApprovalBanner,
   generateSidebarActionButtons,
+  generateSessionInfoHeader,
+  SessionDisplayInfo,
   generateCommentModal,
   generateBottomBar,
   generateEmptyState,
   generateScriptInit,
   generateScriptFooter
 } from './shared';
+import { getSessionTerminal } from './claudeService';
 
 export class ArtifactViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   public static readonly viewType = 'claudeArtifacts.artifactView';
@@ -153,11 +157,29 @@ export class ArtifactViewProvider implements vscode.WebviewViewProvider, vscode.
 
   /**
    * Public methods for keyboard shortcuts
+   * New Claude options (as of 2025):
+   * 1. Bypass and Clear Context
+   * 2. Bypass
+   * 3. Manual Edit/Accept
+   * 4. Feedback
    */
-  public async approve(): Promise<void> {
+  public async approveBypassClear(): Promise<void> {
     if (this._state.planApproved) return;
     try {
       await this._state.claudeService.sendChoice(1);
+      this._state.setApproved('bypassClear');
+      this._updateApprovalState();
+      vscode.window.showInformationMessage('Plan approved (bypass + clear context)');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      vscode.window.showErrorMessage(msg);
+    }
+  }
+
+  public async approve(): Promise<void> {
+    if (this._state.planApproved) return;
+    try {
+      await this._state.claudeService.sendChoice(2);
       this._state.setApproved('bypass');
       this._updateApprovalState();
       vscode.window.showInformationMessage('Plan approved (bypass permissions)');
@@ -170,7 +192,7 @@ export class ArtifactViewProvider implements vscode.WebviewViewProvider, vscode.
   public async approveManual(): Promise<void> {
     if (this._state.planApproved) return;
     try {
-      await this._state.claudeService.sendChoice(2);
+      await this._state.claudeService.sendChoice(3);
       this._state.setApproved('manual');
       this._updateApprovalState();
       vscode.window.showInformationMessage('Plan approved (manual edits)');
@@ -188,7 +210,7 @@ export class ArtifactViewProvider implements vscode.WebviewViewProvider, vscode.
     try {
       const feedback = this._state.getFormattedComments();
       const commentCount = this._state.clearComments();
-      await this._state.claudeService.sendChoiceWithFeedback(3, feedback);
+      await this._state.claudeService.sendChoiceWithFeedback(4, feedback);
       this._updateComments();
       vscode.window.showInformationMessage(`Sent ${commentCount} comment(s) to Claude`);
     } catch (error) {
@@ -206,10 +228,18 @@ export class ArtifactViewProvider implements vscode.WebviewViewProvider, vscode.
     const approveBtn = getApproveButtonLabel(this._state.permissionMode);
     const modeIndicator = getModeIndicator(this._state.permissionMode);
     const isApproved = this._state.planApproved;
-    const approvalModeText = this._state.approvalMode === 'bypass' ? 'Bypass Mode' : this._state.approvalMode === 'manual' ? 'Manual Mode' : '';
+    const approvalModeText = this._state.approvalMode === 'bypassClear' ? 'Bypass + Clear' : this._state.approvalMode === 'bypass' ? 'Bypass Mode' : this._state.approvalMode === 'manual' ? 'Manual Mode' : '';
 
     // Source badge for Claude Code
     const sourceLabel = 'Claude';
+
+    // Session info - extract session ID from plan filename
+    const sessionId = filePath ? path.basename(filePath, '.md') : undefined;
+    const sessionInfo: SessionDisplayInfo | undefined = sessionId ? {
+      sessionId,
+      lastActivity: timeAgo || undefined,
+      isConnected: getSessionTerminal(sessionId) !== undefined
+    } : undefined;
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -236,6 +266,8 @@ export class ArtifactViewProvider implements vscode.WebviewViewProvider, vscode.
     ${HEADER_CSS}
 
     ${MODE_BADGE_CSS}
+
+    ${SESSION_INFO_CSS}
 
     .approval-banner {
       display: flex;
@@ -368,7 +400,6 @@ export class ArtifactViewProvider implements vscode.WebviewViewProvider, vscode.
         ${ICONS.openFile}
         ${fileName}
       </span>
-      ${timeAgo ? `<span class="time-ago">${timeAgo}</span>` : ''}
       ${modeIndicator ? `<span class="mode-badge" title="Claude permission mode">${modeIndicator}</span>` : ''}
     </div>
     <div class="header-right">
@@ -378,6 +409,8 @@ export class ArtifactViewProvider implements vscode.WebviewViewProvider, vscode.
     </div>
   </div>
   ` : ''}
+
+  ${generateSessionInfoHeader(sessionInfo)}
 
   ${generateApprovalBanner(isApproved, approvalModeText)}
 

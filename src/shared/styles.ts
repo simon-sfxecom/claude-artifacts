@@ -37,6 +37,79 @@ export const MODE_BADGE_CSS = `
   }
 `;
 
+export const SESSION_INFO_CSS = `
+  .session-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 12px;
+    background: var(--input-bg);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  .session-info-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .session-info-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .session-label {
+    color: var(--muted);
+  }
+
+  .session-id {
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-weight: 500;
+    color: var(--foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .session-project {
+    color: var(--muted);
+    font-size: 10px;
+  }
+
+  .session-project::before {
+    content: "•";
+    margin-right: 6px;
+  }
+
+  .session-activity {
+    color: var(--muted);
+    font-size: 10px;
+  }
+
+  .connection-status {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+  }
+
+  .connection-status.connected {
+    color: var(--success);
+    background: rgba(78, 201, 176, 0.15);
+  }
+
+  .connection-status.disconnected {
+    color: var(--warning);
+    background: rgba(204, 167, 0, 0.15);
+  }
+`;
+
 export const ACTION_BUTTON_CSS = `
   .action-btn {
     padding: 8px 12px;
@@ -59,6 +132,11 @@ export const ACTION_BUTTON_CSS = `
   .action-btn.primary {
     background: var(--success);
     color: #000;
+  }
+
+  .action-btn.primary.clear {
+    background: #3794ff;
+    color: #fff;
   }
 
   .action-btn.primary:hover {

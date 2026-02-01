@@ -5,6 +5,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import { getSessionService } from '../services/sessionService';
 import { ClaudeProject, ClaudeSession, ClaudePlan, SessionStatus } from '../models/session';
 
@@ -46,17 +47,39 @@ export class SessionInboxProvider implements vscode.TreeDataProvider<SessionTree
   private fileWatcher: vscode.FileSystemWatcher | undefined;
   private refreshTimeout: NodeJS.Timeout | undefined;
   private liveUpdateInterval: NodeJS.Timeout | undefined;
+  private initTimeout: NodeJS.Timeout | undefined;  // Track init timeout for disposal
   private disposables: vscode.Disposable[] = [];
   private liveSessionStates: Map<string, LiveSessionState> = new Map();
+  private isUpdating = false;  // Mutex flag to prevent concurrent updates
+  private disposed = false;    // Flag to prevent operations after disposal
 
   constructor() {
-    this.setupFileWatcher();
-    this.setupWorkspaceWatcher();
-    this.setupLiveUpdates();
+    try {
+      this.setupFileWatcher();
+    } catch (error) {
+      console.error('SessionInboxProvider: Failed to setup file watcher:', error);
+    }
+    try {
+      this.setupWorkspaceWatcher();
+    } catch (error) {
+      console.error('SessionInboxProvider: Failed to setup workspace watcher:', error);
+    }
+    try {
+      this.setupLiveUpdates();
+    } catch (error) {
+      console.error('SessionInboxProvider: Failed to setup live updates:', error);
+    }
+    console.log('SessionInboxProvider: Initialization complete');
   }
 
   private setupFileWatcher(): void {
     const claudeDir = this.sessionService.getClaudeDir();
+
+    // Check if directory exists before creating watcher
+    if (!fs.existsSync(claudeDir)) {
+      console.warn(`SessionInboxProvider: Claude directory not found: ${claudeDir}`);
+      return;
+    }
 
     // Watch history.jsonl for new activity
     const historyPattern = new vscode.RelativePattern(claudeDir, 'history.jsonl');
@@ -77,13 +100,39 @@ export class SessionInboxProvider implements vscode.TreeDataProvider<SessionTree
   }
 
   private setupLiveUpdates(): void {
+    // Defer first update to allow provider to be fully registered
+    // This prevents race conditions during initialization
+    this.initTimeout = setTimeout(() => {
+      if (!this.disposed) {
+        this.startLiveUpdateInterval();
+      }
+    }, 1000); // 1 second delay
+  }
+
+  private startLiveUpdateInterval(): void {
+    // Clear any existing interval
+    if (this.liveUpdateInterval) {
+      clearInterval(this.liveUpdateInterval);
+    }
+
     // Poll active sessions for live updates
     this.liveUpdateInterval = setInterval(async () => {
-      await this.updateLiveSessionStates();
+      try {
+        await this.updateLiveSessionStates();
+      } catch (error) {
+        console.error('SessionInboxProvider: Live update failed:', error);
+        // Don't stop the interval - next tick might succeed
+      }
     }, LIVE_UPDATE_INTERVAL);
   }
 
   private async updateLiveSessionStates(): Promise<void> {
+    // Prevent concurrent updates (race condition protection)
+    if (this.isUpdating || this.disposed) {
+      return;
+    }
+    this.isUpdating = true;
+
     try {
       const allProjects = await this.sessionService.getProjects();
       const activeSessions = allProjects.flatMap(p =>
@@ -123,12 +172,14 @@ export class SessionInboxProvider implements vscode.TreeDataProvider<SessionTree
         }
       }
 
-      // Only refresh if something changed
-      if (hasChanges) {
+      // Only refresh if something changed and not disposed
+      if (hasChanges && !this.disposed) {
         this._onDidChangeTreeData.fire();
       }
     } catch (error) {
       console.error('Failed to update live session states:', error);
+    } finally {
+      this.isUpdating = false;
     }
   }
 
@@ -533,10 +584,18 @@ export class SessionInboxProvider implements vscode.TreeDataProvider<SessionTree
   }
 
   dispose(): void {
+    // Set disposed flag first to stop any running operations
+    this.disposed = true;
+
     this._onDidChangeTreeData.dispose();
     this.disposables.forEach(d => d.dispose());
     this.disposables = [];
     this.fileWatcher?.dispose();
+
+    // Clear all timeouts/intervals
+    if (this.initTimeout) {
+      clearTimeout(this.initTimeout);
+    }
     if (this.refreshTimeout) {
       clearTimeout(this.refreshTimeout);
     }
