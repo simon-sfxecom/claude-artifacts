@@ -2,7 +2,7 @@
   "name": "claude-artifacts",
   "displayName": "Claude Artifacts",
   "description": "Live preview of Claude Code plan files with Mermaid diagram support",
-  "version": "0.1.6",
+  "version": "0.2.1",
   "publisher": "sfx",
   "license": "MIT",
   "repository": {
@@ -77,6 +77,11 @@
         "title": "Open Plan in New Tab",
         "category": "Claude Artifacts",
         "icon": "$(split-horizontal)"
+      },
+      {
+        "command": "claudeArtifacts.approveBypassClear",
+        "title": "Approve Plan (Bypass + Clear Context)",
+        "category": "Claude Artifacts"
       },
       {
         "command": "claudeArtifacts.approve",
@@ -188,19 +193,24 @@
         "mac": "cmd+shift+m"
       },
       {
-        "command": "claudeArtifacts.approve",
+        "command": "claudeArtifacts.approveBypassClear",
         "key": "ctrl+shift+1",
         "mac": "cmd+shift+1"
       },
       {
-        "command": "claudeArtifacts.approveManual",
+        "command": "claudeArtifacts.approve",
         "key": "ctrl+shift+2",
         "mac": "cmd+shift+2"
       },
       {
-        "command": "claudeArtifacts.sendFeedback",
+        "command": "claudeArtifacts.approveManual",
         "key": "ctrl+shift+3",
         "mac": "cmd+shift+3"
+      },
+      {
+        "command": "claudeArtifacts.sendFeedback",
+        "key": "ctrl+shift+4",
+        "mac": "cmd+shift+4"
       }
     ],
     "menus": {

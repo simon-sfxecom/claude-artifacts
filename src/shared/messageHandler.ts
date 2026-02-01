@@ -22,7 +22,7 @@ export interface WebviewContext {
 export class ArtifactState {
   private _comments: Comment[] = [];
   private _planApproved: boolean = false;
-  private _approvalMode: 'bypass' | 'manual' | null = null;
+  private _approvalMode: 'bypassClear' | 'bypass' | 'manual' | null = null;
   private _claudeService: ClaudeService;
   private _permissionMode: PermissionMode;
   private _sessionId: string | undefined;
@@ -53,7 +53,7 @@ export class ArtifactState {
     return this._planApproved;
   }
 
-  get approvalMode(): 'bypass' | 'manual' | null {
+  get approvalMode(): 'bypassClear' | 'bypass' | 'manual' | null {
     return this._approvalMode;
   }
 
@@ -107,7 +107,7 @@ export class ArtifactState {
   /**
    * Set approval state
    */
-  setApproved(mode: 'bypass' | 'manual'): void {
+  setApproved(mode: 'bypassClear' | 'bypass' | 'manual'): void {
     this._planApproved = true;
     this._approvalMode = mode;
   }
@@ -143,15 +143,22 @@ export async function handleWebviewMessage(
       await context.openFile();
       break;
 
-    case 'approve':
+    case 'approveBypassClear':
       await state.claudeService.sendChoice(1);
+      state.setApproved('bypassClear');
+      result.updateApproval = true;
+      vscode.window.showInformationMessage('Plan approved (bypass + clear context)');
+      break;
+
+    case 'approve':
+      await state.claudeService.sendChoice(2);
       state.setApproved('bypass');
       result.updateApproval = true;
       vscode.window.showInformationMessage('Plan approved (bypass permissions)');
       break;
 
     case 'approveManual':
-      await state.claudeService.sendChoice(2);
+      await state.claudeService.sendChoice(3);
       state.setApproved('manual');
       result.updateApproval = true;
       vscode.window.showInformationMessage('Plan approved (manual edits)');
@@ -164,7 +171,7 @@ export async function handleWebviewMessage(
       }
       const feedback = state.getFormattedComments();
       const commentCount = state.clearComments();
-      await state.claudeService.sendChoiceWithFeedback(3, feedback);
+      await state.claudeService.sendChoiceWithFeedback(4, feedback);
       result.updateComments = true;
       vscode.window.showInformationMessage(`Sent ${commentCount} comment(s) to Claude`);
       break;

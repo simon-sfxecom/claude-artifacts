@@ -54,18 +54,37 @@ function extractSession(arg: unknown): ClaudeSession | null {
   return null;
 }
 
-export function activate(context: vscode.ExtensionContext) {
+/**
+ * Initialize all async services before registering providers.
+ * This prevents race conditions where providers access uninitialized services.
+ */
+async function initializeServices(): Promise<{
+  videoRecordingService: ReturnType<typeof getVideoRecordingService>;
+  sessionMonitor: ReturnType<typeof getSessionMonitor>;
+}> {
+  const mediaCaptureService = getMediaCaptureService();
+  const sessionMonitor = getSessionMonitor();
+  const videoRecordingService = getVideoRecordingService();
+
+  try {
+    await mediaCaptureService.initialize();
+    await sessionMonitor.autoMonitorActiveSessions();
+    await videoRecordingService.initialize();
+    console.log('Claude Artifacts: All services initialized');
+  } catch (error) {
+    // Log but don't throw - allow extension to continue with degraded functionality
+    console.error('Claude Artifacts: Service initialization failed:', error);
+  }
+
+  return { videoRecordingService, sessionMonitor };
+}
+
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   console.log('Claude Artifacts extension is now active');
 
-  // Initialize Phase 3 services
-  const mediaCaptureService = getMediaCaptureService();
-  mediaCaptureService.initialize();
-
-  const sessionMonitor = getSessionMonitor();
-  sessionMonitor.autoMonitorActiveSessions();
-
-  const videoRecordingService = getVideoRecordingService();
-  videoRecordingService.initialize();
+  // Phase 1: Initialize async services BEFORE registering providers
+  // Note: Services are initialized for side effects; videoRecordingService and sessionMonitor used in commands below
+  const { videoRecordingService, sessionMonitor } = await initializeServices();
 
   // Create the webview provider
   const artifactViewProvider = new ArtifactViewProvider(context);
@@ -78,14 +97,38 @@ export function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  // Create and register session inbox provider
-  const sessionInboxProvider = new SessionInboxProvider();
-  context.subscriptions.push(
-    vscode.window.registerTreeDataProvider(
+  // Create and register session inbox provider with error handling
+  let sessionInboxProvider: SessionInboxProvider | undefined;
+  try {
+    sessionInboxProvider = new SessionInboxProvider();
+    const disposable = vscode.window.registerTreeDataProvider(
       'claudeArtifacts.sessionInbox',
       sessionInboxProvider
-    )
-  );
+    );
+    // Register both the disposable and the provider for proper cleanup
+    context.subscriptions.push(disposable, sessionInboxProvider);
+    console.log('Claude Artifacts: SessionInboxProvider registered successfully');
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('Claude Artifacts: Failed to register SessionInboxProvider:', error);
+    vscode.window.showErrorMessage(`Claude Artifacts: Session view failed to load. ${msg}`);
+
+    // Register a minimal fallback provider that shows an error message
+    // Create EventEmitter and track it for proper disposal
+    const fallbackEmitter = new vscode.EventEmitter<void>();
+    const fallbackProvider: vscode.TreeDataProvider<{ label: string }> = {
+      onDidChangeTreeData: fallbackEmitter.event,
+      getTreeItem: (element) => new vscode.TreeItem(element.label),
+      getChildren: () => Promise.resolve([
+        { label: '⚠️ Failed to load sessions' },
+        { label: 'Check Output for details' }
+      ])
+    };
+    context.subscriptions.push(
+      fallbackEmitter,  // Dispose the EventEmitter to prevent memory leak
+      vscode.window.registerTreeDataProvider('claudeArtifacts.sessionInbox', fallbackProvider)
+    );
+  }
 
   // Register Mission Control command
   context.subscriptions.push(
@@ -124,9 +167,13 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     // Notify session inbox about plan updates
-    sessionInboxProvider.refresh();
+    sessionInboxProvider?.refresh();
   });
-  planService.start();
+
+  // Start plan service with error handling
+  planService.start().catch(error => {
+    console.error('Claude Artifacts: Failed to start plan service:', error);
+  });
 
   // Register refresh command
   context.subscriptions.push(
@@ -210,8 +257,12 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Register keyboard shortcut commands
+  // Register keyboard shortcut commands for plan approval
+  // New Claude options (as of 2025): 1=Bypass+Clear, 2=Bypass, 3=Manual, 4=Feedback
   context.subscriptions.push(
+    vscode.commands.registerCommand('claudeArtifacts.approveBypassClear', () => {
+      artifactViewProvider.approveBypassClear();
+    }),
     vscode.commands.registerCommand('claudeArtifacts.approve', () => {
       artifactViewProvider.approve();
     }),
@@ -226,7 +277,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Session inbox commands
   context.subscriptions.push(
     vscode.commands.registerCommand('claudeArtifacts.refreshSessions', () => {
-      sessionInboxProvider.refresh();
+      sessionInboxProvider?.refresh();
     }),
     vscode.commands.registerCommand('claudeArtifacts.resumeSession', async (arg: unknown) => {
       const session = extractSession(arg);
@@ -546,9 +597,9 @@ export function activate(context: vscode.ExtensionContext) {
   const statusBarInterval = setInterval(updateStatusBar, 30000); // Every 30 seconds
 
   // Register disposables for cleanup
+  // Note: sessionInboxProvider is already registered above with try/catch
   context.subscriptions.push(
     artifactViewProvider,
-    sessionInboxProvider,
     { dispose: () => disposePlanService() },
     { dispose: () => clearInterval(statusBarInterval) }
   );

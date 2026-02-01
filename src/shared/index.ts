@@ -18,6 +18,7 @@ export { ArtifactState, WebviewContext, handleWebviewMessage } from './messageHa
 export {
   CSS_VARIABLES,
   MODE_BADGE_CSS,
+  SESSION_INFO_CSS,
   ACTION_BUTTON_CSS,
   MODAL_CSS,
   COMMENT_CSS,
@@ -41,6 +42,8 @@ export {
 export {
   ICONS,
   generateApprovalBanner,
+  generateSessionInfoHeader,
+  SessionDisplayInfo,
   generateSidebarActionButtons,
   generatePanelActionButtons,
   generateCommentModal,

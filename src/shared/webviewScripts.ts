@@ -159,6 +159,10 @@ export const ACTION_FUNCTIONS = `
     vscode.postMessage({ type: 'openFullscreen' });
   }
 
+  function approveBypassClear() {
+    vscode.postMessage({ type: 'approveBypassClear' });
+  }
+
   function approve() {
     vscode.postMessage({ type: 'approve' });
   }

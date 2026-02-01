@@ -29,9 +29,10 @@ export interface ButtonLabel {
 export type WebviewMessage =
   | { type: 'openFile' }
   | { type: 'openFullscreen' }
-  | { type: 'approve' }
-  | { type: 'approveManual' }
-  | { type: 'sendFeedback' }
+  | { type: 'approveBypassClear' }  // Option 1: Bypass and Clear Context
+  | { type: 'approve' }              // Option 2: Bypass
+  | { type: 'approveManual' }        // Option 3: Manual Edit/Accept
+  | { type: 'sendFeedback' }         // Option 4: Feedback
   | { type: 'addComment'; value: string; lineNumber: number; sectionTitle?: string }
   | { type: 'deleteComment'; commentId: string }
   | { type: 'sendMessage'; value: string; planMode?: boolean };
@@ -41,4 +42,4 @@ export type WebviewMessage =
  */
 export type WebviewOutgoingMessage =
   | { type: 'updateComments'; comments: Comment[] }
-  | { type: 'setApprovalState'; approved: boolean; mode: 'bypass' | 'manual' | null };
+  | { type: 'setApprovalState'; approved: boolean; mode: 'bypassClear' | 'bypass' | 'manual' | null };
