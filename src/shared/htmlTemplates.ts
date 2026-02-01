@@ -28,6 +28,9 @@ export const ICONS = {
   openFile: `<svg viewBox="0 0 16 16" fill="currentColor">
     <path d="M13.5 3H10V2h3.5A1.5 1.5 0 0115 3.5v10a1.5 1.5 0 01-1.5 1.5h-10A1.5 1.5 0 012 13.5V10h1v3.5a.5.5 0 00.5.5h10a.5.5 0 00.5-.5v-10a.5.5 0 00-.5-.5z"/>
     <path d="M1 4h7.793l-1.147 1.146.708.708L10.707 3.5 8.354 1.146l-.708.708L8.793 3H1v1z"/>
+  </svg>`,
+  fullscreen: `<svg viewBox="0 0 16 16" fill="currentColor">
+    <path d="M3 3h4v1H4v3H3V3zm6 0h4v4h-1V4H9V3zM3 9h1v3h3v1H3V9zm9 0h4v4h-1v-3h-3V9z"/>
   </svg>`
 };
 
