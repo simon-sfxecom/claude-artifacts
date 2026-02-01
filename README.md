@@ -63,10 +63,12 @@ A VS Code extension for managing Claude Code sessions with Mission Control dashb
 
 ### 📋 Plan Preview
 - **Live Plan Preview**: Real-time rendering of plan files
+- **Session Info Header**: Shows which Claude session created the plan
+- **Connection Status**: Indicates if terminal is connected for routing
 - **Mermaid Diagram Support**: Automatic rendering of all diagram types
 - **Split View**: Open multiple plans in separate tabs
 - **Interactive Comments**: Click sections to add feedback
-- **Text Selection Comments**: Select any text to comment
+- **4 Approval Options**: Bypass+Clear, Bypass, Manual, Feedback (Claude 2025)
 
 ## 🚀 Quick Start
 
@@ -143,9 +145,10 @@ View captures: Right-click session → "View Session Summary"
 | Action | Mac | Windows/Linux |
 |--------|-----|---------------|
 | Mission Control | `Cmd+Shift+M` | `Ctrl+Shift+M` |
-| Accept All (Bypass) | `Cmd+Shift+1` | `Ctrl+Shift+1` |
-| Manual Approve | `Cmd+Shift+2` | `Ctrl+Shift+2` |
-| Send Feedback | `Cmd+Shift+3` | `Ctrl+Shift+3` |
+| Bypass + Clear Context | `Cmd+Shift+1` | `Ctrl+Shift+1` |
+| Bypass Permissions | `Cmd+Shift+2` | `Ctrl+Shift+2` |
+| Manual Approve | `Cmd+Shift+3` | `Ctrl+Shift+3` |
+| Send Feedback | `Cmd+Shift+4` | `Ctrl+Shift+4` |
 
 ## 🏗️ Architecture
 
@@ -213,7 +216,6 @@ The extension works out-of-the-box with Claude Code. All data is stored in:
 - Video recording requires FFmpeg installation
 - Wayland support on Linux uses X11grab (may require X11 compatibility)
 - macOS screen recording requires Screen Recording permission (System Preferences → Privacy)
-- Plan sidebar in embedded terminal shows most recent plan (not session-specific yet)
 
 ## 🎯 Performance
 
