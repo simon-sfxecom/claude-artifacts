@@ -11,6 +11,7 @@ import {
   getRelativeTime,
   CSS_VARIABLES,
   MODE_BADGE_CSS,
+  HEADER_CSS,
   MARKDOWN_CSS,
   MERMAID_INIT,
   UTILITY_FUNCTIONS,
@@ -77,6 +78,12 @@ export class ArtifactViewProvider implements vscode.WebviewViewProvider, vscode.
 
   private async _handleMessage(data: WebviewMessage) {
     try {
+      // Handle openFullscreen directly
+      if (data.type === 'openFullscreen') {
+        vscode.commands.executeCommand('claudeArtifacts.openInTab');
+        return;
+      }
+
       const context = {
         postMessage: (msg: WebviewOutgoingMessage) => this._postMessage(msg),
         getFilePath: () => this._currentFilePath,
@@ -203,7 +210,6 @@ export class ArtifactViewProvider implements vscode.WebviewViewProvider, vscode.
 
     // Source badge for Claude Code
     const sourceLabel = 'Claude';
-    const sourceBadgeColor = '#a855f7';
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -227,48 +233,7 @@ export class ArtifactViewProvider implements vscode.WebviewViewProvider, vscode.
       height: 100vh;
     }
 
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--border-color);
-      flex-shrink: 0;
-    }
-
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .filename {
-      font-size: 11px;
-      color: var(--muted);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .filename:hover { color: var(--link-color); }
-    .filename svg { width: 12px; height: 12px; }
-
-    .time-ago {
-      font-size: 10px;
-      color: var(--muted);
-      opacity: 0.7;
-    }
-
-    .source-badge {
-      font-size: 9px;
-      padding: 2px 6px;
-      border-radius: 3px;
-      background: ${sourceBadgeColor}22;
-      color: ${sourceBadgeColor};
-      border: 1px solid ${sourceBadgeColor}44;
-      font-weight: 500;
-    }
+    ${HEADER_CSS}
 
     ${MODE_BADGE_CSS}
 
@@ -400,14 +365,16 @@ export class ArtifactViewProvider implements vscode.WebviewViewProvider, vscode.
     <div class="header-left">
       <span class="source-badge">${sourceLabel}</span>
       <span class="filename" onclick="openFile()">
-        <svg viewBox="0 0 16 16" fill="currentColor">
-          <path d="M13.5 3H10V2h3.5A1.5 1.5 0 0115 3.5v10a1.5 1.5 0 01-1.5 1.5h-10A1.5 1.5 0 012 13.5V10h1v3.5a.5.5 0 00.5.5h10a.5.5 0 00.5-.5v-10a.5.5 0 00-.5-.5z"/>
-          <path d="M1 4h7.793l-1.147 1.146.708.708L10.707 3.5 8.354 1.146l-.708.708L8.793 3H1v1z"/>
-        </svg>
+        ${ICONS.openFile}
         ${fileName}
       </span>
       ${timeAgo ? `<span class="time-ago">${timeAgo}</span>` : ''}
       ${modeIndicator ? `<span class="mode-badge" title="Claude permission mode">${modeIndicator}</span>` : ''}
+    </div>
+    <div class="header-right">
+      <button class="icon-btn" onclick="openFullscreen()" title="Open in Fullscreen Tab">
+        ${ICONS.fullscreen}
+      </button>
     </div>
   </div>
   ` : ''}

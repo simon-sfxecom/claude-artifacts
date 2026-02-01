@@ -28,6 +28,7 @@ export interface ButtonLabel {
  */
 export type WebviewMessage =
   | { type: 'openFile' }
+  | { type: 'openFullscreen' }
   | { type: 'approve' }
   | { type: 'approveManual' }
   | { type: 'sendFeedback' }

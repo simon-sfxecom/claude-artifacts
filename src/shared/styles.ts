@@ -261,6 +261,100 @@ export const INPUT_CSS = `
   }
 `;
 
+export const HEADER_CSS = `
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 4px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .icon-btn:hover {
+    background: var(--input-bg);
+    border-color: var(--border-color);
+    color: var(--foreground);
+  }
+
+  .icon-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .filename {
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .filename:hover {
+    color: var(--link-color);
+  }
+
+  .filename svg {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+  }
+
+  .time-ago {
+    font-size: 10px;
+    color: var(--muted);
+    opacity: 0.7;
+    white-space: nowrap;
+  }
+
+  .source-badge {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    /* Claude brand purple - intentionally hardcoded for consistent branding */
+    background: #a855f722;
+    color: #a855f7;
+    border: 1px solid #a855f744;
+    font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+`;
+
 export const MARKDOWN_CSS = `
   h1, h2, h3, h4, h5, h6 {
     color: var(--heading-color);

@@ -23,7 +23,8 @@ export {
   COMMENT_CSS,
   INPUT_CSS,
   MARKDOWN_CSS,
-  LOADING_CSS
+  LOADING_CSS,
+  HEADER_CSS
 } from './styles';
 
 // Webview Scripts

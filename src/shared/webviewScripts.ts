@@ -155,6 +155,10 @@ export const ACTION_FUNCTIONS = `
     vscode.postMessage({ type: 'openFile' });
   }
 
+  function openFullscreen() {
+    vscode.postMessage({ type: 'openFullscreen' });
+  }
+
   function approve() {
     vscode.postMessage({ type: 'approve' });
   }
